@@ -50,6 +50,8 @@ button{font:inherit;cursor:pointer;border:0;border-radius:12px;color:var(--ink)}
 .pick .big{background:var(--ball);color:#1c2530;text-align:center}
 .pick input{margin-top:8px}
 .pick .sel{background:var(--ball);color:#1c2530;border-color:var(--ball)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chips button,.pick .chips button{width:auto;margin:0;padding:8px 14px;font-size:14px;border-radius:20px;background:var(--wall);border:1.5px solid var(--line);text-align:center}
 .coin{width:130px;height:130px;border-radius:50%;background:var(--ball);color:#1c2530;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;margin:18px auto;border:4px solid var(--ink)}
 .coin.fl{animation:flip 1.2s ease-out}
 @keyframes flip{from{transform:rotateY(0)}to{transform:rotateY(1080deg)}}
@@ -65,6 +67,7 @@ details div{font-size:14px;padding:3px 0}
 <script>
 (function(){
 var KEY_M='gully_match',KEY_H='gully_history';
+var DB='https://gully-cricket-6e23c-default-rtdb.asia-southeast1.firebasedatabase.app',LIVE_URL='https://gully-cricket-6e23c.web.app/';
 var app=document.getElementById('app'),m=null,undo=[],wl=null,rsOpen=false,pend=null,AC=null;
 function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
@@ -90,13 +93,24 @@ function snd(t){
 m=ld(KEY_M,null);
 if(m&&m.v!==3){m=null;rm(KEY_M)}
 if(m)undo=ld('gully_undo',[]);
-function save(){sv(KEY_M,m);sv('gully_undo',undo.slice(-40))}
+function push(){
+ if(!m||!m.live||!navigator.onLine)return;
+ try{
+  var c=JSON.parse(JSON.stringify(m));delete c.hbak;delete c.sum0;delete c.ro;
+  fetch(DB+'/live/'+m.live+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(c)}).catch(function(){});
+ }catch(e){}
+}
+function save(){sv(KEY_M,m);sv('gully_undo',undo.slice(-40));push()}
 function pb(n){return{n:n,r:0,b:0,x4:0,x6:0,o:0}}
 function pw(n){return{n:n,b:0,r:0,w:0}}
 function mkInn(bat){return{bat:bat,r:0,w:0,b:0,ball:[],bs:[],bo:[],st:-1,ns:-1,pn:0,oe:0,bw:-1,lb:-1,fh:0,op:1,os:[]}}
 function wireMenu(){
  document.getElementById('menu').onclick=function(){
   if(confirm('Abandon this match and go to home?')){m=null;undo=[];pend=null;rm(KEY_M);rm('gully_undo');render()}};
+ var lv=document.getElementById('lv');
+ if(lv)lv.onclick=function(){
+  if(!m.live){m.live=Math.random().toString(36).slice(2,7).toUpperCase();save();render()}
+  share('Watch live: '+m.t[0]+' v '+m.t[1]+'\n'+LIVE_URL+'?c='+m.live)};
  var sn=document.getElementById('sn');
  if(sn)sn.onclick=function(){sv('gully_snd',ld('gully_snd',1)?0:1);render()};
 }
@@ -168,23 +182,41 @@ function ruleList(){
  var a=[];if(m.lm)a.push('Last man bats');if(m.fh)a.push('Free hit after a no-ball');return a;
 }
 var TYPES=['Bowled','Caught','LBW','Stumped','Hit wicket','Run out'];
+function roster(t){
+ var seen={},out=[],skip=/^(Batsman|Bowler) \d+$/;
+ function add(n){var k=n.toLowerCase();if(!seen[k]&&!skip.test(n)){seen[k]=1;out.push(n)}}
+ ((m.ro||[])[t]||[]).forEach(add);
+ m.inn.forEach(function(x){
+  if(x.bat==t)x.bs.forEach(function(p){add(p.n)});
+  if(1-x.bat==t)x.bo.forEach(function(p){add(p.n)});
+ });
+ return out;
+}
+function sugg(t,used,att){
+ var u=used.map(function(n){return n.toLowerCase()});
+ var a=roster(t).filter(function(n){return u.indexOf(n.toLowerCase())<0});
+ return a.length?'<div class="chips">'+a.map(function(n){return'<button data-'+att+'="'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'';
+}
 function score(){
  keep();
  var i=m.inn[m.cur];
  var tgt=m.cur==1?m.inn[0].r+1:0,left=tgt?tgt-i.r:0,bl=m.ov*6-i.b;
  var crr=i.b?(i.r*6/i.b).toFixed(2):'0.00';
  var snOn=ld('gully_snd',1);
- var head='<div class="top"><div><b>'+esc(m.t[i.bat])+'</b> batting<div class="meta">'+esc(m.t[1-i.bat])+' bowling &middot; '+(m.so?'Super Over '+m.so:'Innings '+(m.cur+1))+'</div></div><div><button class="ghost" id="sn">Sound '+(snOn?'on':'off')+'</button> <button class="ghost" id="menu">Menu</button></div></div>';
+ var head='<div class="top"><div><b>'+esc(m.t[i.bat])+'</b> batting<div class="meta">'+esc(m.t[1-i.bat])+' bowling &middot; '+(m.so?'Super Over '+m.so:'Innings '+(m.cur+1))+(m.live?' &middot; Live '+m.live:'')+'</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="ghost" id="lv">Live</button><button class="ghost" id="sn">Sound '+(snOn?'on':'off')+'</button><button class="ghost" id="menu">Menu</button></div></div>';
  if(i.op){
   var lab=m.cur?'Start innings':'Start match';
   app.innerHTML=head+'<div class="card"><h2>'+lab+'</h2>'+(m.toss&&!m.cur?'<div class="meta">'+esc(m.toss)+'</div>':'')+(tgt?'<div class="target">Target: '+tgt+' runs</div>':'')+
   '<label>Opening batsman (on strike)</label><input type="text" id="o1">'+
-  '<label>Opening batsman (non-striker)</label><input type="text" id="o2">'+
-  '<label>Opening bowler</label><input type="text" id="o3">'+
+  '<label>Opening batsman (non-striker)</label><input type="text" id="o2">'+sugg(i.bat,[],'sb')+
+  '<label>Opening bowler</label><input type="text" id="o3">'+sugg(1-i.bat,[],'sw')+
   '<button class="big" id="stt">'+lab+'</button></div>';
   document.getElementById('stt').onclick=function(){
    var v=function(d,x){return document.getElementById(d).value.trim()||x};
    i.bs=[pb(v('o1','Batsman 1')),pb(v('o2','Batsman 2'))];i.st=0;i.ns=1;i.bo=[pw(v('o3','Bowler 1'))];i.bw=0;i.op=0;save();render()};
+  app.querySelectorAll('[data-sb]').forEach(function(b){b.onclick=function(){
+   var a=document.getElementById('o1'),c=document.getElementById('o2'),t=a.value.trim()?c:a;t.value=b.dataset.sb;b.remove()}});
+  app.querySelectorAll('[data-sw]').forEach(function(b){b.onclick=function(){document.getElementById('o3').value=b.dataset.sw}});
   wireMenu();return;
  }
  if(pend&&(i.pn||i.bw<0))pend=null;
@@ -193,11 +225,11 @@ function score(){
  var bw=i.bw>=0?'<div class="hist"><span>Bowling: '+esc(i.bo[i.bw].n)+'</span><b>'+overs(i.bo[i.bw].b)+'-'+i.bo[i.bw].r+'-'+i.bo[i.bw].w+'</b></div>':'';
  var body;
  if(i.pn){
-  body='<div class="card pick"><h2>'+(i.wk?'Wicket! Who bats next?':'Who comes in?')+'</h2><input type="text" id="nn" placeholder="Batsman name"><button class="big" id="nbt">Send in</button></div>';
+  body='<div class="card pick"><h2>'+(i.wk?'Wicket! Who bats next?':'Who comes in?')+'</h2><input type="text" id="nn" placeholder="Batsman name">'+sugg(i.bat,i.bs.map(function(p){return p.n}),'nb')+'<button class="big" id="nbt">Send in</button></div>';
  }else if(i.bw<0){
   body='<div class="card pick"><h2>Who bowls over '+(Math.floor(i.b/6)+1)+'?</h2>'+i.bo.map(function(o,k){
    return'<button data-bw="'+k+'"'+(k==i.lb?' disabled':'')+'>'+esc(o.n)+'<span style="float:right;color:var(--mute)">'+overs(o.b)+'-'+o.r+'-'+o.w+'</span></button>'}).join('')+
-   (i.bo.length<m.pl?'<label>New bowler</label><input type="text" id="nbw" placeholder="Bowler name"><button class="big" id="abw">Add bowler</button>':'')+'</div>';
+   (i.bo.length<m.pl?'<label>New bowler</label><input type="text" id="nbw" placeholder="Bowler name">'+sugg(1-i.bat,i.bo.map(function(p){return p.n}),'nw')+'<button class="big" id="abw">Add bowler</button>':'')+'</div>';
  }else if(pend&&(pend.t=='by'||pend.t=='lb')){
   body='<div class="card pick"><h2>'+(pend.t=='by'?'Byes':'Leg byes')+': how many runs?</h2><div class="pad">'+[1,2,3,4].map(function(n){return'<button data-ex="'+n+'">'+n+'</button>'}).join('')+'</div><button data-pc="1" style="margin-top:10px;text-align:center">Cancel</button></div>';
  }else if(pend&&pend.t=='w'){
@@ -246,6 +278,8 @@ function score(){
   else if(i.oe){i.st=i.ns;i.ns=n}
   else i.st=n;
   i.pn=0;i.oe=0;i.pw='';i.wk=0;save();render()};
+ app.querySelectorAll('[data-nb]').forEach(function(b){b.onclick=function(){document.getElementById('nn').value=b.dataset.nb;document.getElementById('nbt').click()}});
+ app.querySelectorAll('[data-nw]').forEach(function(b){b.onclick=function(){document.getElementById('nbw').value=b.dataset.nw;document.getElementById('abw').click()}});
  var rsb=document.getElementById('rs');if(rsb)rsb.onclick=function(){rsOpen=true;render()};
  app.querySelectorAll('[data-rt]').forEach(function(b){b.onclick=function(){var t=b.dataset.rt;rsOpen=false;
   if(t=='x'){render();return}
@@ -302,7 +336,7 @@ function ball(k,v,o){
 }
 function undoBall(){
  if(!undo.length){toast('Nothing to undo');return}
- pend=null;m=JSON.parse(undo.pop());save();render();
+ pend=null;var lv0=m.live;m=JSON.parse(undo.pop());if(lv0)m.live=lv0;save();render();
 }
 function finish(s){
  var a=m.inn[0],b=m.inn[1],A=m.t[a.bat],B=m.t[b.bat];
@@ -418,7 +452,7 @@ function result(){
  var so=document.getElementById('so');
  if(so)so.onclick=function(){
   var f=m.inn[1].bat;
-  var nm={v:3,t:m.t,ov:1,pl:3,lm:false,fh:m.fh,wd:m.wd,nb:m.nb,cur:0,done:false,res:'',first:f,so:(m.so||0)+1,toss:'',
+  var nm={v:3,live:m.live,ro:[roster(0),roster(1)],t:m.t,ov:1,pl:3,lm:false,fh:m.fh,wd:m.wd,nb:m.nb,cur:0,done:false,res:'',first:f,so:(m.so||0)+1,toss:'',
    mres:(m.mres?m.mres+' → ':'')+(m.so?'Super Over: ':'')+m.res,
    sum0:(m.sum0?m.sum0+'\n\n':'')+summary(m)};
   nm.inn=[mkInn(f),mkInn(1-f)];m=nm;undo=[];save();render()};
@@ -427,7 +461,7 @@ function result(){
   var h=ld(KEY_H,[]);
   if(m.so&&m.hbak)h[0]=JSON.parse(m.hbak);else h.shift();
   sv(KEY_H,h);
-  m=JSON.parse(undo.pop());save();render()};
+  var lv1=m.live;m=JSON.parse(undo.pop());if(lv1)m.live=lv1;save();render()};
  document.getElementById('nw').onclick=function(){m=null;undo=[];rm(KEY_M);rm('gully_undo');render()};
 }
 
@@ -463,12 +497,42 @@ function leaderboard(){
  document.getElementById('bk').onclick=home;
 }
 
+/* ---------- Live viewer ---------- */
+function norm(M){M.inn.forEach(function(i){['bs','bo','ball','os'].forEach(function(k){i[k]=i[k]||[]})});return M}
+function watch(code){
+ function draw(M){
+  if(!M||!M.inn){app.innerHTML='<div class="top"><h1>LIVE</h1></div><div class="card"><div class="meta">Waiting for match '+esc(code)+'. Check the link or the code.</div></div>';return}
+  norm(M);
+  var i=M.inn[M.cur],h='<div class="top"><div><h1>LIVE</h1><div class="meta">Match '+esc(code)+' &middot; refreshes every 3 sec</div></div></div>';
+  if(M.done){
+   var mo=motmTxt(M);
+   h+='<div class="card"><div class="res">'+(M.so?'Super Over: ':'')+esc(M.res)+'</div>'+(mo?'<div class="meta">Man of the match: <b>'+esc(mo)+'</b></div>':'')+'</div>';
+  }else if(i.op){
+   h+='<div class="card"><h2>'+esc(M.t[i.bat])+' batting next</h2><div class="meta">Innings starting soon</div></div>';
+  }else{
+   var tgt=M.cur==1?M.inn[0].r+1:0,bl=M.ov*6-i.b;
+   var bats=[i.st,i.ns].filter(function(x){return x>=0&&i.bs[x]}).map(function(x){var b=i.bs[x];return'<div class="hist"><span>'+(x==i.st?'&#9733; ':'')+esc(b.n)+'</span><b>'+b.r+' ('+b.b+')</b></div>'}).join('');
+   var bw=i.bw>=0&&i.bo[i.bw]?'<div class="hist"><span>Bowling: '+esc(i.bo[i.bw].n)+'</span><b>'+overs(i.bo[i.bw].b)+'-'+i.bo[i.bw].r+'-'+i.bo[i.bw].w+'</b></div>':'';
+   h+='<div class="card"><div class="meta"><b>'+esc(M.t[i.bat])+'</b> batting</div><div class="score">'+i.r+'<small>/'+i.w+'</small></div><div class="meta">Overs '+overs(i.b)+' of '+M.ov+'</div>'+
+   (tgt?'<div class="target">Need '+Math.max(tgt-i.r,0)+' off '+bl+' balls</div>':'')+
+   '<div class="ov">'+i.ball.map(function(t){return'<div class="b '+(/^W(\+|$)/.test(t)?'w':(/^(Wd|Nb|B|LB)/.test(t)?'x':''))+'">'+t+'</div>'}).join('')+'</div>'+bats+bw+'</div>';
+  }
+  M.inn.forEach(function(x){if(x.bs.length)h+=sheet(M,x)});
+  app.innerHTML=h;
+ }
+ function poll(){
+  fetch(DB+'/live/'+code+'.json').then(function(r){return r.json()}).then(draw).catch(function(){});
+ }
+ draw(null);poll();setInterval(poll,3000);
+}
+
 function render(){
  if(!m)return home();
  if(m.done)return result();
  score();
 }
-render();
+var wc=null;try{wc=new URLSearchParams(location.search).get('c')}catch(e){}
+if(wc)watch(wc.toUpperCase());else render();
 })();
 </script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
