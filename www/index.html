@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1c2530">
+<title>Gully Cricket Score</title>
+<style>
+:root{--ink:#1c2530;--wall:#dfe5e8;--card:#f7f9fa;--ball:#e4e12a;--wkt:#d6372b;--mute:#5d6b78;--line:#b9c4cb}
+@media (prefers-color-scheme:dark){:root{--ink:#eef2f4;--wall:#141b22;--card:#1e2832;--mute:#9aa8b4;--line:#34424e}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--wall);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{max-width:520px;margin:0 auto;padding:14px 14px 40px}
+h1,h2{margin:0;font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;font-weight:400;letter-spacing:.5px}
+h1{font-size:30px}h2{font-size:22px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input[type=text],input[type=number]{width:100%;padding:12px;font-size:17px;border:1.5px solid var(--line);border-radius:10px;background:var(--wall);color:var(--ink)}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.chk{display:flex;align-items:center;gap:10px;font-size:15px;margin:10px 0;color:var(--ink)}
+.chk input{width:22px;height:22px;accent-color:var(--wkt)}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;color:var(--ink)}
+.big{width:100%;padding:16px;font-size:18px;font-weight:700;background:var(--ball);color:#1c2530;margin-top:8px}
+.ghost{background:transparent;border:1.5px solid var(--line);padding:9px 14px;font-size:14px}
+.score{font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;font-size:76px;line-height:1;letter-spacing:1px}
+.score small{font-size:30px;color:var(--mute)}
+.meta{color:var(--mute);font-size:15px;margin-top:6px}
+.target{margin-top:10px;padding:8px 12px;background:var(--ball);color:#1c2530;border-radius:10px;font-weight:700;font-size:15px}
+.ov{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;min-height:38px}
+.b{min-width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;background:var(--wall);border:1.5px solid var(--line);padding:0 6px}
+.b.w{background:var(--wkt);color:#fff;border-color:var(--wkt)}
+.b.x{background:var(--ball);color:#1c2530;border-color:var(--ball)}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pad button{height:68px;font-size:26px;font-weight:700;background:var(--card);border:1.5px solid var(--line)}
+.pad button:active{transform:scale(.95)}
+.pad .f{background:var(--ball);color:#1c2530;border-color:var(--ball)}
+.pad .o{background:var(--wkt);color:#fff;border-color:var(--wkt);font-size:22px}
+.pad .s{font-size:17px}
+.hist{display:flex;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.hist:last-child{border:0}
+.res{font-size:26px;margin:6px 0 10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--wall);padding:10px 16px;border-radius:10px;font-size:14px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+var KEY_M='gully_match',KEY_H='gully_history';
+var app=document.getElementById('app'),m=null,undo=[],view='home';
+function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toast(t){var d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},1800)}
+function overs(b){return Math.floor(b/6)+'.'+(b%6)}
+
+m=ld(KEY_M,null);
+if(m){undo=ld('gully_undo',[]);view=m.done?'result':'score'}
+
+function save(){sv(KEY_M,m);sv('gully_undo',undo.slice(-40))}
+
+/* ---------- Home / setup ---------- */
+function home(){
+ var h=ld(KEY_H,[]);
+ app.innerHTML='<div class="top"><h1>Gully Cricket</h1></div>'+
+ '<div class="card"><h2>New match</h2>'+
+ '<label>Team A</label><input type="text" id="ta" value="Team A">'+
+ '<label>Team B</label><input type="text" id="tb" value="Team B">'+
+ '<div class="row"><div><label>Overs per side</label><input type="number" id="ov" value="6" min="1" max="50"></div>'+
+ '<div><label>Players per side</label><input type="number" id="pl" value="6" min="2" max="11"></div></div>'+
+ '<label>Who bats first?</label><div class="row"><button class="ghost" id="f0">Team A</button><button class="ghost" id="f1">Team B</button></div>'+
+ '<label>Gully rules</label>'+
+ '<div class="chk"><input type="checkbox" id="lm"><span>Last man bats (alone)</span></div>'+
+ '<div class="chk"><input type="checkbox" id="ohb" checked><span>One hand, one bounce is out (use W)</span></div>'+
+ '<div class="row"><div><label>Wide adds</label><input type="number" id="wd" value="1" min="0" max="5"></div>'+
+ '<div><label>No-ball adds</label><input type="number" id="nb" value="1" min="0" max="5"></div></div>'+
+ '<button class="big" id="go">Start match</button></div>'+
+ (h.length?'<div class="card"><h2>Past matches</h2>'+h.map(function(x,i){return'<div class="hist"><div><b>'+esc(x.sum)+'</b><div class="meta">'+esc(x.date)+' &middot; '+esc(x.res)+'</div></div><button class="ghost" data-i="'+i+'">Share</button></div>'}).join('')+
+ '<button class="ghost" id="exp" style="margin-top:10px">Backup history</button> <button class="ghost" id="clr" style="margin-top:10px">Clear</button></div>':'');
+ var first=0;
+ function mark(){document.getElementById('f0').style.background=first==0?'var(--ball)':'';document.getElementById('f0').style.color=first==0?'#1c2530':'';
+  document.getElementById('f1').style.background=first==1?'var(--ball)':'';document.getElementById('f1').style.color=first==1?'#1c2530':''}
+ mark();
+ document.getElementById('f0').onclick=function(){first=0;mark()};
+ document.getElementById('f1').onclick=function(){first=1;mark()};
+ document.getElementById('go').onclick=function(){
+  var g=function(i){return document.getElementById(i).value};
+  m={t:[g('ta').trim()||'Team A',g('tb').trim()||'Team B'],ov:Math.max(1,+g('ov')||6),pl:Math.max(2,+g('pl')||6),
+   lm:document.getElementById('lm').checked,ohb:document.getElementById('ohb').checked,
+   wd:+g('wd')||0,nb:+g('nb')||0,cur:0,first:first,
+   inn:[{bat:first,r:0,w:0,b:0,ball:[]},{bat:1-first,r:0,w:0,b:0,ball:[]}],done:false,res:''};
+  undo=[];save();view='score';render()};
+ app.querySelectorAll('[data-i]').forEach(function(b){b.onclick=function(){share(h[+b.dataset.i].text)}});
+ var e=document.getElementById('exp');if(e)e.onclick=function(){share(h.map(function(x){return x.text}).join('\n\n'))};
+ var c=document.getElementById('clr');if(c)c.onclick=function(){if(confirm('Delete all past matches?')){sv(KEY_H,[]);home()}};
+}
+
+/* ---------- Scoring ---------- */
+function maxW(){return m.lm?m.pl:m.pl-1}
+function status(){
+ var i=m.inn[m.cur];
+ if(m.cur==1&&i.r>m.inn[0].r)return 'win';
+ if(i.w>=maxW()||i.b>=m.ov*6)return 'end';
+ return '';
+}
+function score(){
+ var i=m.inn[m.cur],bt=m.t[i.bat],bw=m.t[1-i.bat];
+ var tgt=m.cur==1?m.inn[0].r+1:0,left=tgt?tgt-i.r:0,bl=m.ov*6-i.b;
+ var crr=i.b?(i.r*6/i.b).toFixed(2):'0.00';
+ app.innerHTML='<div class="top"><div><b>'+esc(bt)+'</b> batting<div class="meta">'+esc(bw)+' bowling &middot; Innings '+(m.cur+1)+'</div></div><button class="ghost" id="menu">Menu</button></div>'+
+ '<div class="card"><div class="score">'+i.r+'<small>/'+i.w+'</small></div>'+
+ '<div class="meta">Overs '+overs(i.b)+' of '+m.ov+' &middot; Run rate '+crr+'</div>'+
+ (tgt?'<div class="target">Need '+Math.max(left,0)+' off '+bl+' balls</div>':'')+
+ '<div class="ov">'+i.ball.map(function(t){return'<div class="b '+(t=='W'?'w':(/^(Wd|Nb)/.test(t)?'x':''))+'">'+t+'</div>'}).join('')+'</div></div>'+
+ '<div class="pad">'+[0,1,2,3].map(function(n){return'<button data-r="'+n+'">'+n+'</button>'}).join('')+
+ '<button data-r="4" class="f">4</button><button data-r="6" class="f">6</button>'+
+ '<button data-k="wd" class="s">Wide</button><button data-k="nb" class="s">No ball</button>'+
+ '<button data-k="w" class="o">OUT</button><button data-k="un" class="s">Undo</button></div>'+
+ '<p class="meta" style="text-align:center">'+(m.lm?'Last man bats is ON':'Innings ends when '+(m.pl-1)+' are out')+'</p>';
+ app.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(){ball('r',+b.dataset.r)}});
+ app.querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){var k=b.dataset.k;if(k=='un')undoBall();else ball(k)}});
+ document.getElementById('menu').onclick=function(){
+  if(confirm('Abandon this match and go to home?')){m=null;undo=[];try{localStorage.removeItem(KEY_M);localStorage.removeItem('gully_undo')}catch(e){}view='home';render()}};
+}
+function ball(k,v){
+ undo.push(JSON.stringify(m));
+ var i=m.inn[m.cur],legal=true,tok;
+ if(k=='r'){i.r+=v;tok=String(v)}
+ else if(k=='wd'){i.r+=m.wd;legal=false;tok='Wd'+(m.wd>1?'+'+m.wd:'')}
+ else if(k=='nb'){i.r+=m.nb;legal=false;tok='Nb'+(m.nb>1?'+'+m.nb:'')}
+ else if(k=='w'){i.w++;tok='W'}
+ if(legal)i.b++;
+ i.ball.push(tok);
+ var s=status();
+ if(legal&&i.b%6==0&&!s)i.ball=[];
+ if(s){
+  if(m.cur==0){m.cur=1;toast('Innings over. '+m.t[m.inn[1].bat]+' to chase '+(i.r+1))}
+  else finish(s)
+ }
+ save();render();
+}
+function undoBall(){
+ if(!undo.length){toast('Nothing to undo');return}
+ m=JSON.parse(undo.pop());save();render();
+}
+function finish(s){
+ var a=m.inn[0],b=m.inn[1],A=m.t[a.bat],B=m.t[b.bat];
+ if(s=='win')m.res=B+' won by '+(maxW()-b.w)+' wicket'+(maxW()-b.w==1?'':'s');
+ else if(a.r>b.r)m.res=A+' won by '+(a.r-b.r)+' run'+(a.r-b.r==1?'':'s');
+ else if(a.r==b.r)m.res='Match tied';
+ else m.res=B+' won';
+ m.done=true;
+ var text=summary();
+ var h=ld(KEY_H,[]);
+ h.unshift({sum:A+' '+a.r+'/'+a.w+' v '+B+' '+b.r+'/'+b.w,res:m.res,date:new Date().toLocaleDateString(),text:text});
+ sv(KEY_H,h.slice(0,50));
+}
+function summary(){
+ var a=m.inn[0],b=m.inn[1];
+ return 'Gully Cricket\n'+m.t[a.bat]+': '+a.r+'/'+a.w+' ('+overs(a.b)+' ov)\n'+m.t[b.bat]+': '+b.r+'/'+b.w+' ('+overs(b.b)+' ov)\n'+(m.res?'Result: '+m.res:'');
+}
+function share(t){
+ if(navigator.share){navigator.share({text:t}).catch(function(){})}
+ else window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+}
+
+/* ---------- Result ---------- */
+function result(){
+ var a=m.inn[0],b=m.inn[1];
+ app.innerHTML='<div class="top"><h1>Full time</h1></div>'+
+ '<div class="card"><div class="res">'+esc(m.res)+'</div>'+
+ '<div class="hist"><b>'+esc(m.t[a.bat])+'</b><span>'+a.r+'/'+a.w+' ('+overs(a.b)+' ov)</span></div>'+
+ '<div class="hist"><b>'+esc(m.t[b.bat])+'</b><span>'+b.r+'/'+b.w+' ('+overs(b.b)+' ov)</span></div></div>'+
+ '<button class="big" id="sh">Share scorecard</button>'+
+ '<button class="big" id="un" style="background:var(--card);border:1.5px solid var(--line);color:var(--ink)">Undo last ball</button>'+
+ '<button class="big" id="nw" style="background:var(--card);border:1.5px solid var(--line);color:var(--ink)">New match</button>';
+ document.getElementById('sh').onclick=function(){share(summary())};
+ document.getElementById('un').onclick=function(){
+  if(!undo.length){toast('Nothing to undo');return}
+  var h=ld(KEY_H,[]);h.shift();sv(KEY_H,h);
+  m=JSON.parse(undo.pop());save();render()};
+ document.getElementById('nw').onclick=function(){m=null;undo=[];try{localStorage.removeItem(KEY_M);localStorage.removeItem('gully_undo')}catch(e){}view='home';render()};
+}
+
+function render(){
+ if(!m)return home();
+ if(m.done)return result();
+ score();
+}
+render();
+})();
+</script>
+</body>
+</html>
