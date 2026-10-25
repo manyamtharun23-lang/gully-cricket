@@ -23,6 +23,7 @@ textarea{min-height:90px}
 .chk input{width:22px;height:22px;accent-color:var(--wkt)}
 button{font:inherit;cursor:pointer;border:0;border-radius:12px;color:var(--ink)}
 .big{width:100%;padding:16px;font-size:18px;font-weight:700;background:var(--ball);color:#1c2530;margin-top:8px}
+.big:disabled{opacity:.4}
 .alt{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
 .ghost{background:transparent;border:1.5px solid var(--line);padding:9px 14px;font-size:14px}
 .score{font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif;font-size:76px;line-height:1;letter-spacing:1px}
@@ -44,8 +45,11 @@ button{font:inherit;cursor:pointer;border:0;border-radius:12px;color:var(--ink)}
 .hist:last-child{border:0}
 .pick button{width:100%;padding:14px;margin-top:8px;text-align:left;font-size:16px;background:var(--wall);border:1.5px solid var(--line)}
 .pick button:disabled{opacity:.4}
+.pick .row button{margin-top:0;text-align:center}
+.pick .pad button{margin-top:0;text-align:center}
 .pick .big{background:var(--ball);color:#1c2530;text-align:center}
 .pick input{margin-top:8px}
+.pick .sel{background:var(--ball);color:#1c2530;border-color:var(--ball)}
 .coin{width:130px;height:130px;border-radius:50%;background:var(--ball);color:#1c2530;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;margin:18px auto;border:4px solid var(--ink)}
 .coin.fl{animation:flip 1.2s ease-out}
 @keyframes flip{from{transform:rotateY(0)}to{transform:rotateY(1080deg)}}
@@ -61,7 +65,7 @@ details div{font-size:14px;padding:3px 0}
 <script>
 (function(){
 var KEY_M='gully_match',KEY_H='gully_history';
-var app=document.getElementById('app'),m=null,undo=[],wl=null,rsOpen=false;
+var app=document.getElementById('app'),m=null,undo=[],wl=null,rsOpen=false,pend=null,AC=null;
 function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function rm(k){try{localStorage.removeItem(k)}catch(e){}}
@@ -72,15 +76,75 @@ function vib(p){try{if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
 function keep(){try{if(navigator.wakeLock&&!wl)navigator.wakeLock.request('screen').then(function(l){wl=l;l.addEventListener('release',function(){wl=null})}).catch(function(){})}catch(e){}}
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&m&&!m.done)keep()});
 
+/* ---------- Sounds ---------- */
+function noise(d){var n=Math.floor(AC.sampleRate*d),b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0),k;for(k=0;k<n;k++)a[k]=Math.random()*2-1;return b}
+function crowd(lv){
+ var d=[1.8,3.2,2.2][lv],g0=[.3,.6,.38][lv],at=[.25,.4,.15][lv],T=AC.currentTime+.05;
+ var bands=[[[700,1100,.6],[1600,2200,.4]],[[600,1000,.6],[1500,2400,.7]],[[900,400,.8],[1800,1200,.25]]][lv];
+ var buf=noise(d);
+ bands.forEach(function(b){
+  var src=AC.createBufferSource();src.buffer=buf;
+  var f=AC.createBiquadFilter();f.type='bandpass';f.Q.value=.7;
+  f.frequency.setValueAtTime(b[0],T);f.frequency.linearRampToValueAtTime(b[1],T+d*.5);
+  var g=AC.createGain(),a=g0*b[2];
+  g.gain.setValueAtTime(.001,T);g.gain.linearRampToValueAtTime(a,T+at);g.gain.setValueAtTime(a,T+d*.45);g.gain.exponentialRampToValueAtTime(.001,T+d);
+  var lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=6+Math.random()*3;lg.gain.value=a*.25;
+  lfo.connect(lg);lg.connect(g.gain);lfo.start(T);lfo.stop(T+d);
+  src.connect(f);f.connect(g);g.connect(AC.destination);src.start(T);
+ });
+}
+function stumps(){
+ var T=AC.currentTime+.01,buf=noise(.1);
+ [0,.04,.09,.15,.23,.32].forEach(function(dt,j){
+  var src=AC.createBufferSource();src.buffer=buf;
+  var f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=2200+j*500;f.Q.value=3;
+  var g=AC.createGain();g.gain.setValueAtTime(.7-j*.09,T+dt);g.gain.exponentialRampToValueAtTime(.001,T+dt+.07);
+  src.connect(f);f.connect(g);g.connect(AC.destination);src.start(T+dt);src.stop(T+dt+.09);
+ });
+ var o=AC.createOscillator(),g2=AC.createGain();
+ o.frequency.setValueAtTime(180,T);o.frequency.exponentialRampToValueAtTime(70,T+.15);
+ g2.gain.setValueAtTime(.5,T);g2.gain.exponentialRampToValueAtTime(.001,T+.18);
+ o.connect(g2);g2.connect(AC.destination);o.start(T);o.stop(T+.2);
+}
+function snd(t){
+ if(!ld('gully_snd',1))return;
+ try{
+  AC=AC||new(window.AudioContext||window.webkitAudioContext)();
+  if(AC.state=='suspended')AC.resume();
+  if(t=='S'){stumps();return}
+  var seq={'4':[[660,.1],[880,.18]],'6':[[523,.1],[659,.1],[784,.1],[1047,.28]],'W':[[300,.2],[220,.2],[150,.4]],
+   'C':[[2400,.05],[3100,.05],[2400,.05],[3100,.05],[2400,.05],[3100,.05],[2400,.05],[3100,.05],[2400,.05],[3100,.05],[2400,.05],[3100,.05],[2400,.05],[3100,.05],[2400,.05],[3100,.05]],
+   'D':[[3300,.07],[2700,.22]],
+   'N':[[880,.14],[660,.14],[880,.14],[660,.25]],
+   'M':[[523,.12],[659,.12],[784,.12],[1047,.12],[784,.1],[1047,.45]]}[t];
+  var T=AC.currentTime;
+  seq.forEach(function(s){
+   var o=AC.createOscillator(),g=AC.createGain();
+   o.type=t=='W'?'sawtooth':(t=='C'||t=='D'?'sine':(t=='N'?'square':'triangle'));o.frequency.value=s[0];
+   g.gain.setValueAtTime(.2,T);g.gain.exponentialRampToValueAtTime(.001,T+s[1]);
+   o.connect(g);g.connect(AC.destination);o.start(T);o.stop(T+s[1]);T+=s[1];
+  });
+  if(t=='4')crowd(0);else if(t=='6')crowd(1);else if(t=='W')crowd(2);
+ }catch(e){}
+}
+
 m=ld(KEY_M,null);
 if(m&&m.v!==3){m=null;rm(KEY_M)}
 if(m)undo=ld('gully_undo',[]);
 function save(){sv(KEY_M,m);sv('gully_undo',undo.slice(-40))}
 function pb(n){return{n:n,r:0,b:0,x4:0,x6:0,o:0}}
 function pw(n){return{n:n,b:0,r:0,w:0}}
-function mkInn(bat){return{bat:bat,r:0,w:0,b:0,ball:[],bs:[],bo:[],st:-1,ns:-1,pn:0,oe:0,bw:-1,lb:-1,fh:0,op:1}}
-function wireMenu(){document.getElementById('menu').onclick=function(){
-  if(confirm('Abandon this match and go to home?')){m=null;undo=[];rm(KEY_M);rm('gully_undo');render()}}}
+function mkInn(bat){return{bat:bat,r:0,w:0,b:0,ball:[],bs:[],bo:[],st:-1,ns:-1,pn:0,oe:0,bw:-1,lb:-1,fh:0,op:1,os:[]}}
+function wireMenu(){
+ document.getElementById('menu').onclick=function(){
+  if(confirm('Abandon this match and go to home?')){m=null;undo=[];pend=null;rm(KEY_M);rm('gully_undo');render()}};
+ var sn=document.getElementById('sn');
+ if(sn)sn.onclick=function(){sv('gully_snd',ld('gully_snd',1)?0:1);render()};
+}
+function dis(x){
+ if(x.o)return typeof x.o=='string'?' - '+x.o+(x.bb&&x.o!='Run out'?' b '+x.bb:''):' - out';
+ return x.rt?' (retired)':' *';
+}
 
 /* ---------- Home / setup ---------- */
 function home(){
@@ -90,14 +154,14 @@ function home(){
  '<div class="row"><div><label>Team A</label><input type="text" id="ta" placeholder="Team A name"></div><div><label>Team B</label><input type="text" id="tb" placeholder="Team B name"></div></div>'+
  '<div class="row"><div><label>Overs per side</label><input type="number" id="ov" value="6" min="1" max="50"></div>'+
  '<div><label>Players per side</label><input type="number" id="pl" value="6" min="2" max="11"></div></div>'+
-  '<label>Gully rules</label>'+
+ '<label>Gully rules</label>'+
  '<div class="chk"><input type="checkbox" id="lm"><span>Last man bats (alone)</span></div>'+
  '<div class="chk"><input type="checkbox" id="fh" checked><span>Free hit after a no-ball</span></div>'+
  '<div class="row"><div><label>Wide adds</label><input type="number" id="wd" value="1" min="0" max="5"></div>'+
  '<div><label>No-ball adds</label><input type="number" id="nb" value="1" min="0" max="5"></div></div>'+
  '<button class="big" id="go">Next: Toss</button></div>'+
- (h.length?'<div class="card"><h2>Past matches</h2>'+h.map(function(x,i){return'<div class="hist"><div><b>'+esc(x.sum)+'</b><div class="meta">'+esc(x.date)+' &middot; '+esc(x.res)+'</div></div><button class="ghost" data-i="'+i+'">Share</button></div>'}).join('')+
- '<button class="ghost" id="exp" style="margin-top:10px">Backup history</button> <button class="ghost" id="clr" style="margin-top:10px">Clear</button></div>':'');
+ (h.length?'<div class="card"><h2>Past matches</h2>'+h.map(function(x,i){return'<div class="hist"><div><b>'+esc(x.sum)+'</b><div class="meta">'+esc(x.date)+' &middot; '+esc(x.res)+'</div></div><div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-o="'+i+'">Open</button><button class="ghost" data-i="'+i+'">Share</button></div></div>'}).join('')+
+ '<button class="ghost" id="lbd" style="margin-top:10px">Leaderboard</button> <button class="ghost" id="exp" style="margin-top:10px">Backup history</button> <button class="ghost" id="clr" style="margin-top:10px">Clear</button></div>':'');
  document.getElementById('go').onclick=function(){
   var g=function(i){return document.getElementById(i).value},c=function(i){return document.getElementById(i).checked};
   var pl=Math.min(11,Math.max(2,+g('pl')||6));
@@ -105,7 +169,9 @@ function home(){
    lm:c('lm'),fh:c('fh'),wd:+g('wd')||0,nb:+g('nb')||0,cur:0,done:false,res:''};
   toss(cfg)};
  app.querySelectorAll('[data-i]').forEach(function(b){b.onclick=function(){share(h[+b.dataset.i].text)}});
+ app.querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){past(+b.dataset.o)}});
  var e=document.getElementById('exp');if(e)e.onclick=function(){share(h.map(function(x){return x.text}).join('\n\n'))};
+ var l=document.getElementById('lbd');if(l)l.onclick=leaderboard;
  var c2=document.getElementById('clr');if(c2)c2.onclick=function(){if(confirm('Delete all past matches?')){sv(KEY_H,[]);home()}};
 }
 
@@ -117,7 +183,7 @@ function toss(cfg){
  function flip(call){
   var coin=document.getElementById('coin'),face=Math.random()<0.5?0:1,w=face==call?0:1;
   document.getElementById('hd').onclick=null;document.getElementById('tl').onclick=null;
-  coin.textContent='';coin.className='coin fl';
+  coin.textContent='';coin.className='coin fl';snd('C');setTimeout(function(){snd('D')},1000);
   setTimeout(function(){
    var W=cfg.t[w],fc=face?'TAILS':'HEADS';
    app.innerHTML='<div class="top"><h1>Toss</h1></div><div class="card" style="text-align:center"><div class="coin">'+fc+'</div><h2>'+esc(W)+' won the toss</h2><div class="meta">Choose to</div><div class="row"><button class="big" id="bt">Bat first</button><button class="big" id="bl">Bowl first</button></div></div>';
@@ -142,12 +208,14 @@ function status(){
 function ruleList(){
  var a=[];if(m.lm)a.push('Last man bats');if(m.fh)a.push('Free hit after a no-ball');return a;
 }
+var TYPES=['Bowled','Caught','LBW','Stumped','Hit wicket','Run out'];
 function score(){
  keep();
  var i=m.inn[m.cur];
  var tgt=m.cur==1?m.inn[0].r+1:0,left=tgt?tgt-i.r:0,bl=m.ov*6-i.b;
  var crr=i.b?(i.r*6/i.b).toFixed(2):'0.00';
- var head='<div class="top"><div><b>'+esc(m.t[i.bat])+'</b> batting<div class="meta">'+esc(m.t[1-i.bat])+' bowling &middot; Innings '+(m.cur+1)+'</div></div><button class="ghost" id="menu">Menu</button></div>';
+ var snOn=ld('gully_snd',1);
+ var head='<div class="top"><div><b>'+esc(m.t[i.bat])+'</b> batting<div class="meta">'+esc(m.t[1-i.bat])+' bowling &middot; '+(m.so?'Super Over '+m.so:'Innings '+(m.cur+1))+'</div></div><div><button class="ghost" id="sn">Sound '+(snOn?'on':'off')+'</button> <button class="ghost" id="menu">Menu</button></div></div>';
  if(i.op){
   var lab=m.cur?'Start innings':'Start match';
   app.innerHTML=head+'<div class="card"><h2>'+lab+'</h2>'+(m.toss&&!m.cur?'<div class="meta">'+esc(m.toss)+'</div>':'')+(tgt?'<div class="target">Target: '+tgt+' runs</div>':'')+
@@ -160,20 +228,32 @@ function score(){
    i.bs=[pb(v('o1','Batsman 1')),pb(v('o2','Batsman 2'))];i.st=0;i.ns=1;i.bo=[pw(v('o3','Bowler 1'))];i.bw=0;i.op=0;save();render()};
   wireMenu();return;
  }
+ if(pend&&(i.pn||i.bw<0))pend=null;
  var bats=[i.st,i.ns].filter(function(x){return x>=0}).map(function(x){var s=i.bs[x];
   return'<div class="hist"><span>'+(x==i.st?'&#9733; ':'')+esc(s.n)+'</span><b>'+s.r+' ('+s.b+')</b></div>'}).join('');
  var bw=i.bw>=0?'<div class="hist"><span>Bowling: '+esc(i.bo[i.bw].n)+'</span><b>'+overs(i.bo[i.bw].b)+'-'+i.bo[i.bw].r+'-'+i.bo[i.bw].w+'</b></div>':'';
  var body;
  if(i.pn){
-  body='<div class="card pick"><h2>'+(i.pw?'Who comes in?':'Wicket! Who bats next?')+'</h2><input type="text" id="nn" placeholder="Batsman name"><button class="big" id="nbt">Send in</button></div>';
+  body='<div class="card pick"><h2>'+(i.wk?'Wicket! Who bats next?':'Who comes in?')+'</h2><input type="text" id="nn" placeholder="Batsman name"><button class="big" id="nbt">Send in</button></div>';
  }else if(i.bw<0){
   body='<div class="card pick"><h2>Who bowls over '+(Math.floor(i.b/6)+1)+'?</h2>'+i.bo.map(function(o,k){
    return'<button data-bw="'+k+'"'+(k==i.lb?' disabled':'')+'>'+esc(o.n)+'<span style="float:right;color:var(--mute)">'+overs(o.b)+'-'+o.r+'-'+o.w+'</span></button>'}).join('')+
    (i.bo.length<m.pl?'<label>New bowler</label><input type="text" id="nbw" placeholder="Bowler name"><button class="big" id="abw">Add bowler</button>':'')+'</div>';
+ }else if(pend&&(pend.t=='by'||pend.t=='lb')){
+  body='<div class="card pick"><h2>'+(pend.t=='by'?'Byes':'Leg byes')+': how many runs?</h2><div class="pad">'+[1,2,3,4].map(function(n){return'<button data-ex="'+n+'">'+n+'</button>'}).join('')+'</div><button data-pc="1" style="margin-top:10px;text-align:center">Cancel</button></div>';
+ }else if(pend&&pend.t=='w'){
+  body='<div class="card pick"><h2>How is he out?</h2>'+(i.fh?'<div class="meta">Free hit: only run out is possible</div>':'')+
+  TYPES.map(function(t){return'<button data-ty="'+t+'" class="'+(pend.ty==t?'sel':'')+'"'+(i.fh&&t!='Run out'?' disabled':'')+'>'+t+'</button>'}).join('');
+  if(pend.ty=='Run out'){
+   body+='<label>Who is out?</label><div class="row"><button data-who="st" class="'+(pend.who=='st'?'sel':'')+'">'+esc(i.bs[i.st].n)+'</button>'+(i.ns>=0?'<button data-who="ns" class="'+(pend.who=='ns'?'sel':'')+'">'+esc(i.bs[i.ns].n)+'</button>':'')+'</div>'+
+   '<label>Runs completed before run out</label><div class="row">'+[0,1,2,3].map(function(n){return'<button data-rn="'+n+'" class="'+(pend.rn==n?'sel':'')+'">'+n+'</button>'}).join('')+'</div>';
+  }
+  body+='<button class="big" id="cf"'+(pend.ty?'':' disabled')+'>Confirm OUT</button><button data-pc="1" style="text-align:center">Cancel</button></div>';
  }else{
   body='<div class="pad">'+[0,1,2,3].map(function(n){return'<button data-r="'+n+'">'+n+'</button>'}).join('')+
   '<button data-r="4" class="f">4</button><button data-r="6" class="f">6</button>'+
   '<button data-k="wd" class="s">Wide</button><button data-k="nb" class="s">No ball</button>'+
+  '<button data-k="by" class="s">Bye</button><button data-k="lb" class="s">Leg bye</button>'+
   '<button data-k="w" class="o">OUT</button><button data-k="un" class="s">Undo</button></div>';
   body+=rsOpen?'<div class="card pick"><h2>Retire / Substitute</h2><button data-rt="st">Retire '+esc(i.bs[i.st].n)+' (on strike)</button>'+(i.ns>=0?'<button data-rt="ns">Retire '+esc(i.bs[i.ns].n)+' (non-striker)</button>':'')+'<button data-rt="bw">Bowler leaves: change '+esc(i.bo[i.bw].n)+'</button><button data-rt="x">Cancel</button></div>':'<button class="ghost" style="width:100%;margin-top:10px" id="rs">Retire / Substitute</button>';
  }
@@ -183,47 +263,77 @@ function score(){
  '<div class="card"><div class="score">'+i.r+'<small>/'+i.w+'</small></div>'+
  '<div class="meta">Overs '+overs(i.b)+' of '+m.ov+' &middot; Run rate '+crr+'</div>'+
  (tgt?'<div class="target">Need '+Math.max(left,0)+' off '+bl+' balls</div>':'')+
- (i.fh?'<div class="target fh">FREE HIT: batsman cannot be out</div>':'')+
- '<div class="ov">'+i.ball.map(function(t){return'<div class="b '+(/W/.test(t)?'w':(/^(Wd|Nb)/.test(t)?'x':''))+'">'+t+'</div>'}).join('')+'</div>'+
+ (i.fh?'<div class="target fh">FREE HIT: only run out possible</div>':'')+
+ '<div class="ov">'+i.ball.map(function(t){return'<div class="b '+(/^W(\+|$)/.test(t)?'w':(/^(Wd|Nb|B|LB)/.test(t)?'x':''))+'">'+t+'</div>'}).join('')+'</div>'+
  bats+bw+'</div>'+body+
  (rl.length?'<details><summary>Gully rules</summary>'+rl.map(function(r){return'<div>&bull; '+esc(r)+'</div>'}).join('')+'</details>':'');
  app.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(){ball('r',+b.dataset.r)}});
- app.querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){var k=b.dataset.k;if(k=='un')undoBall();else ball(k)}});
+ app.querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){var k=b.dataset.k;
+  if(k=='un')undoBall();
+  else if(k=='w'||k=='by'||k=='lb'){pend={t:k,ty:(k=='w'&&i.fh)?'Run out':'',who:'st',rn:0};render()}
+  else ball(k)}});
+ app.querySelectorAll('[data-ex]').forEach(function(b){b.onclick=function(){var k=pend.t;ball(k,+b.dataset.ex)}});
+ app.querySelectorAll('[data-ty]').forEach(function(b){b.onclick=function(){pend.ty=b.dataset.ty;render()}});
+ app.querySelectorAll('[data-who]').forEach(function(b){b.onclick=function(){pend.who=b.dataset.who;render()}});
+ app.querySelectorAll('[data-rn]').forEach(function(b){b.onclick=function(){pend.rn=+b.dataset.rn;render()}});
+ app.querySelectorAll('[data-pc]').forEach(function(b){b.onclick=function(){pend=null;render()}});
+ var cf=document.getElementById('cf');if(cf)cf.onclick=function(){var p=pend;ball('w',0,{ty:p.ty,who:p.who,rn:p.rn})};
  app.querySelectorAll('[data-bw]').forEach(function(b){b.onclick=function(){undo.push(JSON.stringify(m));i.bw=+b.dataset.bw;save();render()}});
  var ab=document.getElementById('abw');if(ab)ab.onclick=function(){undo.push(JSON.stringify(m));
   i.bo.push(pw(document.getElementById('nbw').value.trim()||'Bowler '+(i.bo.length+1)));i.bw=i.bo.length-1;save();render()};
  var nb=document.getElementById('nbt');if(nb)nb.onclick=function(){undo.push(JSON.stringify(m));
   i.bs.push(pb(document.getElementById('nn').value.trim()||'Batsman '+(i.bs.length+1)));var n=i.bs.length-1;
-  if(i.pw=='ns')i.ns=n;else if(i.oe){i.st=i.ns;i.ns=n}else i.st=n;i.pn=0;i.oe=0;i.pw='';save();render()};
+  if(i.pw=='ns'){if(i.oe){i.ns=i.st;i.st=n}else i.ns=n}
+  else if(i.oe){i.st=i.ns;i.ns=n}
+  else i.st=n;
+  i.pn=0;i.oe=0;i.pw='';i.wk=0;save();render()};
  var rsb=document.getElementById('rs');if(rsb)rsb.onclick=function(){rsOpen=true;render()};
  app.querySelectorAll('[data-rt]').forEach(function(b){b.onclick=function(){var t=b.dataset.rt;rsOpen=false;
   if(t=='x'){render();return}
   if(t=='bw'){undo.push(JSON.stringify(m));i.lb=i.bw;i.bw=-1;save();render();return}
   if(i.bs.length>=m.pl){toast('No player left to come in');render();return}
-  undo.push(JSON.stringify(m));var x=t=='st'?i.st:i.ns;i.bs[x].rt=1;if(t=='st')i.st=-1;else i.ns=-1;i.pn=1;i.pw=t;save();render()}});
+  undo.push(JSON.stringify(m));var x=t=='st'?i.st:i.ns;i.bs[x].rt=1;if(t=='st')i.st=-1;else i.ns=-1;i.pn=1;i.pw=t;i.wk=0;save();render()}});
  wireMenu();
 }
-function ball(k,v){
- var i=m.inn[m.cur],s=i.st,legal=true,tok,out=false;
- if(k=='w'&&i.fh){toast('Free hit: cannot be out');return}
- undo.push(JSON.stringify(m));
+function ball(k,v,o){
+ o=o||{};
+ var i=m.inn[m.cur],s=i.st,legal=true,tok,out=false,rr=0,rn=0,d=s;
+ if(k=='w'&&i.fh&&o.ty!='Run out'){toast('Free hit: only run out');return}
+ undo.push(JSON.stringify(m));pend=null;
  var bs=i.bs[s],bo=i.bo[i.bw];
- if(k=='r'){i.r+=v;bs.r+=v;bo.r+=v;tok=String(v);
+ if(k=='r'){i.r+=v;bs.r+=v;bo.r+=v;tok=String(v);rr=v;
   if(v==4)bs.x4++;if(v==6)bs.x6++}
+ else if(k=='by'||k=='lb'){i.r+=v;rr=v;tok=(k=='by'?'B':'LB')+v}
  else if(k=='wd'){i.r+=m.wd;bo.r+=m.wd;legal=false;tok='Wd'+(m.wd>1?'+'+m.wd:'')}
  else if(k=='nb'){i.r+=m.nb;bo.r+=m.nb;legal=false;tok='Nb'+(m.nb>1?'+'+m.nb:'');i.fh=m.fh?1:0}
- else{out=true;tok='W'}
+ else{
+  out=true;
+  if(o.ty=='Run out'){rn=o.rn||0;i.r+=rn;bs.r+=rn;bo.r+=rn;if(o.who=='ns'&&i.ns>=0)d=i.ns}
+  else bo.w++;
+  tok='W'+(rn?'+'+rn:'');
+ }
  if(legal){i.b++;bs.b++;bo.b++;if(k!='nb')i.fh=0}
- if(out){i.w++;bs.o=1;bo.w++}
+ if(out){i.w++;var dm=i.bs[d];dm.o=o.ty||'Out';dm.bb=bo.n}
  i.ball.push(tok);
  var st=status();
- if(out)vib([200,80,200]);else if(k=='r'&&(v==4||v==6))vib(60);
+ if(out){vib([200,80,200]);
+  if(/^(Bowled|Stumped|Hit wicket|Run out)$/.test(o.ty)){snd('S');setTimeout(function(){snd('W')},450)}
+  else snd('W')}
+ else if(k=='nb'){vib(120);snd('N')}
+ else if(k=='r'&&(v==4||v==6)){vib(60);snd(String(v))}
  if(!st){
-  if(out){if(i.bs.length<m.pl){i.st=-1;i.pn=1}else{i.st=i.ns;i.ns=-1}}
-  else if(legal&&k=='r'&&v%2==1&&i.ns>=0){var t=i.st;i.st=i.ns;i.ns=t}
+  if(out){
+   if(rn%2==1&&i.ns>=0){var t0=i.st;i.st=i.ns;i.ns=t0}
+   var slot=(d==i.st)?'st':'ns';
+   if(i.bs.length<m.pl){i[slot]=-1;i.pn=1;i.pw=slot;i.wk=1}
+   else{if(slot=='st'){i.st=i.ns;i.ns=-1}else i.ns=-1}
+  }
+  else if(legal&&rr%2==1&&i.ns>=0){var t=i.st;i.st=i.ns;i.ns=t}
   if(legal&&i.b%6==0){
    if(i.pn)i.oe=1;else if(i.ns>=0){var t2=i.st;i.st=i.ns;i.ns=t2}
-   i.lb=i.bw;i.bw=-1;i.ball=[];i.fh=i.fh;
+   var sr=0,sw=0;i.os=i.os||[];i.os.forEach(function(x){sr+=x.r;sw+=x.w});
+   i.os.push({b:bo.n,r:i.r-sr,w:i.w-sw,t:i.ball.join(' ')});
+   i.lb=i.bw;i.bw=-1;i.ball=[];
   }
  }else{
   if(m.cur==0){m.cur=1;toast('Innings over. '+m.t[m.inn[1].bat]+' to chase '+(i.r+1))}
@@ -233,7 +343,7 @@ function ball(k,v){
 }
 function undoBall(){
  if(!undo.length){toast('Nothing to undo');return}
- m=JSON.parse(undo.pop());save();render();
+ pend=null;m=JSON.parse(undo.pop());save();render();
 }
 function finish(s){
  var a=m.inn[0],b=m.inn[1],A=m.t[a.bat],B=m.t[b.bat];
@@ -242,8 +352,16 @@ function finish(s){
  else if(a.r==b.r)m.res='Match tied';
  else m.res=B+' won';
  m.done=true;
+ if(motmTxt(m))setTimeout(function(){snd('M')},700);
  var h=ld(KEY_H,[]);
- h.unshift({sum:A+' '+a.r+'/'+a.w+' v '+B+' '+b.r+'/'+b.w,res:m.res,date:new Date().toLocaleDateString(),text:summary()});
+ var cp=JSON.parse(JSON.stringify(m));delete cp.hbak;
+ var txt=(m.so?m.sum0+'\n\n':'')+summary(m);
+ if(m.so&&h.length){
+  m.hbak=JSON.stringify(h[0]);
+  var o=h[0];o.res=m.mres+' → Super Over: '+m.res;o.text=txt;o.ms=(o.ms||[]).concat([cp]);
+ }else{
+  h.unshift({sum:A+' '+a.r+'/'+a.w+' v '+B+' '+b.r+'/'+b.w,res:m.res,date:new Date().toLocaleDateString(),text:txt,ms:[cp]});
+ }
  sv(KEY_H,h.slice(0,50));
 }
 function best(i){
@@ -254,9 +372,24 @@ function best(i){
  if(i.bo.length&&i.bo[wk].w)t+='\nTop bowl: '+i.bo[wk].n+' '+i.bo[wk].w+'/'+i.bo[wk].r;
  return t;
 }
-function summary(){
- var a=m.inn[0],b=m.inn[1];
- return 'Gully Cricket\n'+(m.toss?m.toss+'\n':'')+m.t[a.bat]+': '+a.r+'/'+a.w+' ('+overs(a.b)+' ov)\n'+best(a)+'\n\n'+m.t[b.bat]+': '+b.r+'/'+b.w+' ('+overs(b.b)+' ov)\n'+best(b)+'\n\n'+(m.res?'Result: '+m.res:'');
+function motm(M){
+ var P={},bst=null;
+ M.inn.forEach(function(i){
+  i.bs.forEach(function(x){var k=i.bat+'|'+x.n.toLowerCase(),p=P[k]=P[k]||{n:x.n,t:i.bat,p:0,r:0,w:0};p.r+=x.r;p.p+=x.r+x.x4+2*x.x6});
+  i.bo.forEach(function(x){var t=1-i.bat,k=t+'|'+x.n.toLowerCase(),p=P[k]=P[k]||{n:x.n,t:t,p:0,r:0,w:0};p.w+=x.w;p.p+=20*x.w});
+ });
+ for(var k in P)if(!bst||P[k].p>bst.p)bst=P[k];
+ return bst&&bst.p>0?bst:null;
+}
+function motmTxt(M){
+ if(M.so)return'';
+ var p=motm(M);if(!p)return'';
+ var s=[];if(p.r)s.push(p.r+' runs');if(p.w)s.push(p.w+' wkt'+(p.w>1?'s':''));
+ return p.n+' ('+M.t[p.t]+') '+s.join(', ');
+}
+function summary(M){
+ var a=M.inn[0],b=M.inn[1],mo=motmTxt(M);
+ return 'Gully Cricket'+(M.so?' - Super Over '+M.so:'')+'\n'+(M.toss?M.toss+'\n':'')+M.t[a.bat]+': '+a.r+'/'+a.w+' ('+overs(a.b)+' ov)\n'+best(a)+'\n\n'+M.t[b.bat]+': '+b.r+'/'+b.w+' ('+overs(b.b)+' ov)\n'+best(b)+'\n\n'+(mo?'Man of the match: '+mo+'\n':'')+(M.res?'Result: '+M.res:'');
 }
 function share(t){
  if(navigator.share){navigator.share({text:t}).catch(function(){})}
@@ -264,38 +397,48 @@ function share(t){
 }
 
 /* ---------- Result ---------- */
-function sheet(i){
- 
- var h='<div class="card"><h2>'+esc(m.t[i.bat])+' '+i.r+'/'+i.w+' ('+overs(i.b)+')</h2>';
+function overList(i){
+ var o=(i.os||[]).slice(),sr=0,sw=0;
+ o.forEach(function(x){sr+=x.r;sw+=x.w});
+ if(i.ball&&i.ball.length&&i.bw>=0)o.push({b:i.bo[i.bw].n,r:i.r-sr,w:i.w-sw,t:i.ball.join(' ')});
+ return o;
+}
+function sheet(M,i){
+ var h='<div class="card"><h2>'+esc(M.t[i.bat])+' '+i.r+'/'+i.w+' ('+overs(i.b)+')</h2>';
  i.bs.forEach(function(x,k){if(x.b||x.o||x.rt||k==i.st||k==i.ns)
-  h+='<div class="hist"><span>'+esc(x.n)+(x.o?'':(x.rt?' (retired)':' *'))+'</span><span>'+x.r+' ('+x.b+') &nbsp;4s '+x.x4+' &nbsp;6s '+x.x6+'</span></div>'});
+  h+='<div class="hist"><span>'+esc(x.n+dis(x))+'</span><span>'+x.r+' ('+x.b+') &nbsp;4s '+x.x4+' &nbsp;6s '+x.x6+'</span></div>'});
  h+='<div class="meta">Bowling (overs-runs-wickets)</div>';
  i.bo.forEach(function(x,k){if(x.b||x.r)h+='<div class="hist"><span>'+esc(x.n)+'</span><span>'+overs(x.b)+'-'+x.r+'-'+x.w+'</span></div>'});
+ var ol=overList(i);
+ if(ol.length)h+='<details><summary>Over by over</summary>'+ol.map(function(x,k){return'<div><b>Ov '+(k+1)+':</b> '+x.r+' run'+(x.r==1?'':'s')+(x.w?', '+x.w+' wkt'+(x.w>1?'s':''):'')+' ('+esc(x.b)+')<br><span style="color:var(--mute)">'+esc(x.t)+'</span></div>'}).join('')+'</details>';
  return h+'</div>';
 }
-function makeImage(){
- var L=[['t','Gully Cricket'],['res',m.res]];
- m.inn.forEach(function(i){
-  L.push(['h',m.t[i.bat]+'  '+i.r+'/'+i.w+'  ('+overs(i.b)+' ov)']);
-  i.bs.forEach(function(x,k){if(x.b||x.o||x.rt||k==i.st||k==i.ns)L.push(['r',x.n+(x.o?'':(x.rt?' (retired)':' *')),x.r+' ('+x.b+')   4s '+x.x4+'  6s '+x.x6])});
+function makeImage(M){
+ var mo=motmTxt(M);
+ var L=[['t','Gully Cricket'+(M.so?' - Super Over':'')],['res',M.res]];
+ if(mo)L.push(['m','Man of the match: '+mo]);
+ M.inn.forEach(function(i){
+  L.push(['h',M.t[i.bat]+'  '+i.r+'/'+i.w+'  ('+overs(i.b)+' ov)']);
+  i.bs.forEach(function(x,k){if(x.b||x.o||x.rt||k==i.st||k==i.ns)L.push(['r',x.n+dis(x),x.r+' ('+x.b+')   4s '+x.x4+'  6s '+x.x6])});
   L.push(['s','Bowling']);
   i.bo.forEach(function(x,k){if(x.b||x.r)L.push(['r',x.n,overs(x.b)+'-'+x.r+'-'+x.w])});
  });
- var ht={t:110,res:90,h:90,r:54,s:60},H=60,W=1080,F='Arial, sans-serif';
+ var ht={t:110,res:90,m:66,h:90,r:54,s:60},H=60,W=1080,F='Arial, sans-serif';
  L.forEach(function(l){H+=ht[l[0]]});H+=40;
  var c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d'),y=60;
  x.fillStyle='#1c2530';x.fillRect(0,0,W,H);x.textAlign='left';
  L.forEach(function(l){var t=l[0];
   if(t=='t'){x.fillStyle='#e4e12a';x.font='bold 72px Impact, '+F;y+=70;x.fillText(l[1],60,y);y+=40}
   else if(t=='res'){x.fillStyle='#fff';x.font='bold 44px '+F;y+=50;x.fillText(l[1],60,y);y+=40}
+  else if(t=='m'){x.fillStyle='#e4e12a';x.font='bold 34px '+F;y+=40;x.fillText(l[1],60,y);y+=26}
   else if(t=='h'){x.fillStyle='#e4e12a';x.font='bold 46px '+F;y+=60;x.fillText(l[1],60,y);y+=30}
   else if(t=='s'){x.fillStyle='#9aa8b4';x.font='32px '+F;y+=40;x.fillText(l[1],60,y);y+=20}
   else{x.fillStyle='#eef2f4';x.font='36px '+F;y+=36;x.textAlign='left';x.fillText(l[1],60,y);x.textAlign='right';x.fillText(l[2],W-60,y);x.textAlign='left';y+=18}
  });
  return c;
 }
-function shareImg(){
- var c=makeImage();
+function shareImg(M){
+ var c=makeImage(M);
  c.toBlob(function(b){var f=null;try{f=new File([b],'gully-scorecard.png',{type:'image/png'})}catch(e){}
   if(f&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return}
   var o=document.createElement('div');o.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:20;overflow:auto;padding:14px;text-align:center';
@@ -304,18 +447,61 @@ function shareImg(){
  },'image/png');
 }
 function result(){
+ var tie=m.res=='Match tied',mo=motmTxt(m);
  app.innerHTML='<div class="top"><h1>Full time</h1></div>'+
- '<div class="card"><div class="res">'+esc(m.res)+'</div></div>'+sheet(m.inn[0])+sheet(m.inn[1])+
+ '<div class="card"><div class="res">'+(m.so?'Super Over: ':'')+esc(m.res)+'</div>'+(mo?'<div class="meta">Man of the match: <b>'+esc(mo)+'</b></div>':'')+'</div>'+sheet(m,m.inn[0])+sheet(m,m.inn[1])+
+ (tie?'<button class="big" id="so">Play Super Over</button>':'')+
  '<button class="big" id="im">Share scorecard image</button>'+'<button class="big alt" id="sh">Share as text</button>'+
  '<button class="big alt" id="un">Undo last ball</button>'+
  '<button class="big alt" id="nw">New match</button>';
- document.getElementById('sh').onclick=function(){share(summary())};
- document.getElementById('im').onclick=shareImg;
+ document.getElementById('sh').onclick=function(){share(summary(m))};
+ document.getElementById('im').onclick=function(){shareImg(m)};
+ var so=document.getElementById('so');
+ if(so)so.onclick=function(){
+  var f=m.inn[1].bat;
+  var nm={v:3,t:m.t,ov:1,pl:3,lm:false,fh:m.fh,wd:m.wd,nb:m.nb,cur:0,done:false,res:'',first:f,so:(m.so||0)+1,toss:'',
+   mres:(m.mres?m.mres+' → ':'')+(m.so?'Super Over: ':'')+m.res,
+   sum0:(m.sum0?m.sum0+'\n\n':'')+summary(m)};
+  nm.inn=[mkInn(f),mkInn(1-f)];m=nm;undo=[];save();render()};
  document.getElementById('un').onclick=function(){
   if(!undo.length){toast('Nothing to undo');return}
-  var h=ld(KEY_H,[]);h.shift();sv(KEY_H,h);
+  var h=ld(KEY_H,[]);
+  if(m.so&&m.hbak)h[0]=JSON.parse(m.hbak);else h.shift();
+  sv(KEY_H,h);
   m=JSON.parse(undo.pop());save();render()};
  document.getElementById('nw').onclick=function(){m=null;undo=[];rm(KEY_M);rm('gully_undo');render()};
+}
+
+/* ---------- Past match view ---------- */
+function past(k){
+ var h=ld(KEY_H,[]),x=h[k];
+ if(!x){home();return}
+ var ms=x.ms||[],mo=ms.length?motmTxt(ms[0]):'';
+ app.innerHTML='<div class="top"><h1>Match</h1><button class="ghost" id="bk">Back</button></div>'+
+ '<div class="card"><div class="res">'+esc(x.res)+'</div><div class="meta">'+esc(x.date)+'</div>'+(mo?'<div class="meta">Man of the match: <b>'+esc(mo)+'</b></div>':'')+'</div>'+
+ (ms.length?ms.map(function(M){return(M.so?'<h2 style="margin:12px 0 6px">Super Over '+M.so+'</h2>':'')+sheet(M,M.inn[0])+sheet(M,M.inn[1])}).join(''):'<div class="card"><pre style="white-space:pre-wrap;font:inherit;margin:0">'+esc(x.text)+'</pre></div>')+
+ (ms.length?'<button class="big" id="im">Share scorecard image</button>':'')+
+ '<button class="big alt" id="sh">Share as text</button><button class="big alt" id="dl">Delete this match</button>';
+ document.getElementById('bk').onclick=home;
+ document.getElementById('sh').onclick=function(){share(x.text)};
+ var im=document.getElementById('im');if(im)im.onclick=function(){shareImg(ms[0])};
+ document.getElementById('dl').onclick=function(){if(confirm('Delete this match?')){h.splice(k,1);sv(KEY_H,h);home()}};
+}
+
+/* ---------- Leaderboard ---------- */
+function leaderboard(){
+ var h=ld(KEY_H,[]),P={},skip=/^(Batsman|Bowler) \d+$/;
+ function pl(n){var k=n.toLowerCase();return P[k]=P[k]||{n:n,r:0,s6:0,w:0}}
+ h.forEach(function(x){(x.ms||[]).forEach(function(M){M.inn.forEach(function(i){
+  i.bs.forEach(function(b){if(skip.test(b.n))return;var p=pl(b.n);p.r+=b.r;p.s6+=b.x6});
+  i.bo.forEach(function(b){if(skip.test(b.n))return;pl(b.n).w+=b.w});
+ })})});
+ function top(f,t){
+  var a=Object.keys(P).map(function(k){return P[k]}).filter(function(p){return p[f]>0}).sort(function(a,b){return b[f]-a[f]}).slice(0,5);
+  return'<div class="card"><h2>'+t+'</h2>'+(a.length?a.map(function(p,k){return'<div class="hist"><span>'+(k+1)+'. '+esc(p.n)+'</span><b>'+p[f]+'</b></div>'}).join(''):'<div class="meta">No data yet</div>')+'</div>';
+ }
+ app.innerHTML='<div class="top"><h1>Leaderboard</h1><button class="ghost" id="bk">Back</button></div>'+top('r','Top scorers (runs)')+top('w','Most wickets')+top('s6','Most sixes')+'<div class="meta">Counts only matches saved with full scorecards. Default names (Batsman 1, Bowler 1) are skipped.</div>';
+ document.getElementById('bk').onclick=home;
 }
 
 function render(){
