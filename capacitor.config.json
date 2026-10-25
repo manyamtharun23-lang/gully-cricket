@@ -1,5 +1,8 @@
 {
   "appId": "com.yourname.gullycricket",
   "appName": "Gully Cricket",
-  "webDir": "www"
+  "webDir": "www",
+  "server": {
+    "url": "https://manyamtharun23-lang.github.io/gully-cricket/"
+  }
 }
