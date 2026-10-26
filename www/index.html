@@ -125,6 +125,7 @@ function home(){
  app.innerHTML='<div class="top"><h1>Gully Cricket</h1></div>'+
  '<div class="card"><h2>New match</h2>'+
  '<div class="row"><div><label>Team A</label><input type="text" id="ta" placeholder="Team A name"></div><div><label>Team B</label><input type="text" id="tb" placeholder="Team B name"></div></div>'+
+ (Object.keys(teams()).length?'<div class="chips">'+Object.keys(teams()).map(function(n){return'<button data-tc="'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'')+
  '<div class="row"><div><label>Overs per side</label><input type="number" id="ov" value="6" min="1" max="50"></div>'+
  '<div><label>Players per side</label><input type="number" id="pl" value="6" min="2" max="11"></div></div>'+
  '<label>Gully rules</label>'+
@@ -133,6 +134,7 @@ function home(){
  '<div class="row"><div><label>Wide adds</label><input type="number" id="wd" value="1" min="0" max="5"></div>'+
  '<div><label>No-ball adds</label><input type="number" id="nb" value="1" min="0" max="5"></div></div>'+
  '<button class="big" id="go">Next: Toss</button></div>'+
+ '<div class="card"><h2>My teams</h2>'+(Object.keys(teams()).length?Object.keys(teams()).map(function(n){return'<div class="hist"><div><b>'+esc(n)+'</b><div class="meta">'+teams()[n].length+' players</div></div><button class="ghost" data-te="'+esc(n)+'">Edit</button></div>'}).join(''):'<div class="meta">No saved teams yet. Teams are saved automatically after a match, or add one here.</div>')+'<button class="ghost" id="tadd" style="margin-top:10px">Add team</button></div>'+
  (h.length?'<div class="card"><h2>Past matches</h2>'+h.map(function(x,i){return'<div class="hist"><div><b>'+esc(x.sum)+'</b><div class="meta">'+esc(x.date)+' &middot; '+esc(x.res)+'</div></div><div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-o="'+i+'">Open</button><button class="ghost" data-i="'+i+'">Share</button></div></div>'}).join('')+
  '<button class="ghost" id="lbd" style="margin-top:10px">Leaderboard</button> <button class="ghost" id="exp" style="margin-top:10px">Backup history</button> <button class="ghost" id="clr" style="margin-top:10px">Clear</button></div>':'');
  document.getElementById('go').onclick=function(){
@@ -141,11 +143,31 @@ function home(){
   var cfg={v:3,t:[g('ta').trim()||'Team A',g('tb').trim()||'Team B'],ov:Math.max(1,+g('ov')||6),pl:pl,
    lm:c('lm'),fh:c('fh'),wd:+g('wd')||0,nb:+g('nb')||0,cur:0,done:false,res:''};
   toss(cfg)};
+ app.querySelectorAll('[data-tc]').forEach(function(b){b.onclick=function(){var a=document.getElementById('ta'),c=document.getElementById('tb');(a.value.trim()?c:a).value=b.dataset.tc}});
+ app.querySelectorAll('[data-te]').forEach(function(b){b.onclick=function(){teamEdit(b.dataset.te)}});
+ document.getElementById('tadd').onclick=function(){teamEdit('')};
  app.querySelectorAll('[data-i]').forEach(function(b){b.onclick=function(){share(h[+b.dataset.i].text)}});
  app.querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){past(+b.dataset.o)}});
  var e=document.getElementById('exp');if(e)e.onclick=function(){share(h.map(function(x){return x.text}).join('\n\n'))};
  var l=document.getElementById('lbd');if(l)l.onclick=leaderboard;
  var c2=document.getElementById('clr');if(c2)c2.onclick=function(){if(confirm('Delete all past matches?')){sv(KEY_H,[]);home()}};
+}
+
+/* ---------- Team editor ---------- */
+function teamEdit(old){
+ var t=teams(),list=old?(t[old]||[]):[];
+ app.innerHTML='<div class="top"><h1>'+(old?'Edit team':'New team')+'</h1><button class="ghost" id="bk">Back</button></div>'+
+ '<div class="card"><label>Team name</label><input type="text" id="tn" value="'+esc(old)+'"><label>Players (one per line)</label><textarea id="tp" style="min-height:200px">'+esc(list.join('\n'))+'</textarea>'+
+ '<button class="big" id="ts">Save team</button>'+(old?'<button class="big alt" id="td">Delete team</button>':'')+'</div>';
+ document.getElementById('bk').onclick=home;
+ document.getElementById('ts').onclick=function(){
+  var name=document.getElementById('tn').value.trim();
+  if(!name){toast('Enter team name');return}
+  var seen={},pl=[];
+  document.getElementById('tp').value.split(/[\n,]+/).forEach(function(x){x=x.trim();if(x&&!seen[x.toLowerCase()]){seen[x.toLowerCase()]=1;pl.push(x)}});
+  var tt=teams();if(old&&old!==name)delete tt[old];tt[name]=pl;sv(KEY_T,tt);home()};
+ var td=document.getElementById('td');
+ if(td)td.onclick=function(){if(confirm('Delete this team?')){var tt=teams();delete tt[old];sv(KEY_T,tt);home()}};
 }
 
 /* ---------- Toss ---------- */
@@ -182,10 +204,25 @@ function ruleList(){
  var a=[];if(m.lm)a.push('Last man bats');if(m.fh)a.push('Free hit after a no-ball');return a;
 }
 var TYPES=['Bowled','Caught','LBW','Stumped','Hit wicket','Run out'];
+var KEY_T='gully_teams';
+function teams(){return ld(KEY_T,{})}
+function learn(){
+ var t=teams();
+ [0,1].forEach(function(k){
+  var name=m.t[k];if(/^Team [AB]$/.test(name))return;
+  var key=Object.keys(t).filter(function(x){return x.toLowerCase()==name.toLowerCase()})[0]||name,cur=t[key]||[],seen={};
+  cur.forEach(function(n){seen[n.toLowerCase()]=1});
+  roster(k).forEach(function(n){if(!seen[n.toLowerCase()]){seen[n.toLowerCase()]=1;cur.push(n)}});
+  if(cur.length)t[key]=cur.slice(0,40);
+ });
+ sv(KEY_T,t);
+}
+function cmt(t,o){m.cm=m.cm||[];m.cm.push({o:o||'',t:t});if(m.cm.length>60)m.cm.shift()}
 function roster(t){
  var seen={},out=[],skip=/^(Batsman|Bowler) \d+$/;
  function add(n){var k=n.toLowerCase();if(!seen[k]&&!skip.test(n)){seen[k]=1;out.push(n)}}
  ((m.ro||[])[t]||[]).forEach(add);
+ var sT=teams();Object.keys(sT).forEach(function(k){if(k.toLowerCase()==String(m.t[t]).toLowerCase())sT[k].forEach(add)});
  m.inn.forEach(function(x){
   if(x.bat==t)x.bs.forEach(function(p){add(p.n)});
   if(1-x.bat==t)x.bo.forEach(function(p){add(p.n)});
@@ -293,7 +330,7 @@ function ball(k,v,o){
  var i=m.inn[m.cur],s=i.st,legal=true,tok,out=false,rr=0,rn=0,d=s;
  if(k=='w'&&i.fh&&o.ty!='Run out'){toast('Free hit: only run out');return}
  undo.push(JSON.stringify(m));pend=null;
- var bs=i.bs[s],bo=i.bo[i.bw];
+ var bs=i.bs[s],bo=i.bo[i.bw],pr0=bs.r;
  if(k=='r'){i.r+=v;bs.r+=v;bo.r+=v;tok=String(v);rr=v;
   if(v==4)bs.x4++;if(v==6)bs.x6++}
  else if(k=='by'||k=='lb'){i.r+=v;rr=v;tok=(k=='by'?'B':'LB')+v}
@@ -308,6 +345,16 @@ function ball(k,v,o){
  if(legal){i.b++;bs.b++;bo.b++;if(k!='nb')i.fh=0}
  if(out){i.w++;var dm=i.bs[d];dm.o=o.ty||'Out';dm.bb=bo.n}
  i.ball.push(tok);
+ var tx,ov=overs(i.b);
+ if(k=='r')tx=v==0?'Dot ball. '+bo.n+' to '+bs.n:v==1?bs.n+' takes a single':v==4?bs.n+' hits a FOUR!':v==6?bs.n+' hits a SIX!':bs.n+' runs '+(v==2?'two':'three');
+ else if(k=='by'||k=='lb')tx=v+(k=='by'?' bye':' leg bye')+(v>1?'s':'');
+ else if(k=='wd')tx='Wide from '+bo.n;
+ else if(k=='nb')tx='No ball from '+bo.n+(i.fh?'. Free hit next!':'');
+ else{var ty=o.ty||'Out';
+  tx=ty=='Run out'?dm.n+' is RUN OUT!'+(rn?' ('+rn+' run'+(rn>1?'s':'')+' completed)':''):ty=='Bowled'?dm.n+' is OUT, bowled by '+bo.n+'!':ty=='Caught'?dm.n+' is OUT, caught! '+bo.n+' gets the wicket':ty=='Stumped'?dm.n+' is OUT, stumped!':ty=='LBW'?dm.n+' is OUT, LBW to '+bo.n+'!':dm.n+' is OUT, '+ty.toLowerCase()+'!';}
+ cmt(tx,ov);
+ if(k=='r'&&pr0<100&&bs.r>=100)cmt(bs.n+' reaches HUNDRED!',ov);
+ else if(k=='r'&&pr0<50&&bs.r>=50)cmt(bs.n+' reaches FIFTY!',ov);
  var st=status();
  if(out){vib([200,80,200]);
   if(/^(Bowled|Stumped|Hit wicket|Run out)$/.test(o.ty)){snd('S');setTimeout(function(){snd('W')},450)}
@@ -326,10 +373,11 @@ function ball(k,v,o){
    if(i.pn)i.oe=1;else if(i.ns>=0){var t2=i.st;i.st=i.ns;i.ns=t2}
    var sr=0,sw=0;i.os=i.os||[];i.os.forEach(function(x){sr+=x.r;sw+=x.w});
    i.os.push({b:bo.n,r:i.r-sr,w:i.w-sw,t:i.ball.join(' ')});
+   cmt('End of over '+(i.b/6)+': '+(i.r-sr)+' run'+((i.r-sr)==1?'':'s')+(i.w-sw?', '+(i.w-sw)+' wkt'+((i.w-sw)>1?'s':''):'')+'. '+m.t[i.bat]+' '+i.r+'/'+i.w,overs(i.b));
    i.lb=i.bw;i.bw=-1;i.ball=[];
   }
  }else{
-  if(m.cur==0){m.cur=1;toast('Innings over. '+m.t[m.inn[1].bat]+' to chase '+(i.r+1))}
+  if(m.cur==0){cmt('Innings over: '+m.t[i.bat]+' '+i.r+'/'+i.w+'. Target '+(i.r+1),overs(i.b));m.cur=1;toast('Innings over. '+m.t[m.inn[1].bat]+' to chase '+(i.r+1))}
   else finish(st)
  }
  save();render();
@@ -345,9 +393,11 @@ function finish(s){
  else if(a.r==b.r)m.res='Match tied';
  else m.res=B+' won';
  m.done=true;
+ cmt('Match over: '+m.res,'');
+ if(!m.so)learn();
  if(motmTxt(m))setTimeout(function(){snd('M')},700);
  var h=ld(KEY_H,[]);
- var cp=JSON.parse(JSON.stringify(m));delete cp.hbak;
+ var cp=JSON.parse(JSON.stringify(m));delete cp.hbak;delete cp.cm;
  var txt=(m.so?m.sum0+'\n\n':'')+summary(m);
  if(m.so&&h.length){
   m.hbak=JSON.stringify(h[0]);
@@ -484,16 +534,25 @@ function past(k){
 /* ---------- Leaderboard ---------- */
 function leaderboard(){
  var h=ld(KEY_H,[]),P={},skip=/^(Batsman|Bowler) \d+$/;
- function pl(n){var k=n.toLowerCase();return P[k]=P[k]||{n:n,r:0,s6:0,w:0}}
- h.forEach(function(x){(x.ms||[]).forEach(function(M){M.inn.forEach(function(i){
-  i.bs.forEach(function(b){if(skip.test(b.n))return;var p=pl(b.n);p.r+=b.r;p.s6+=b.x6});
-  i.bo.forEach(function(b){if(skip.test(b.n))return;pl(b.n).w+=b.w});
+ function pl(n){var k=n.toLowerCase();return P[k]=P[k]||{n:n,r:0,b:0,inn:0,out:0,hs:-1,hsno:0,s6:0,w:0,bb:0,rc:0,mm:{}}}
+ h.forEach(function(x,hi){(x.ms||[]).forEach(function(M){M.inn.forEach(function(i){
+  (i.bs||[]).forEach(function(b){if(skip.test(b.n))return;var p=pl(b.n);p.mm[hi]=1;
+   if(b.b||b.o||b.rt){p.inn++;p.r+=b.r;p.b+=b.b;p.s6+=b.x6;if(b.o)p.out++;if(b.r>p.hs||(b.r==p.hs&&!b.o)){p.hs=b.r;p.hsno=b.o?0:1}}});
+  (i.bo||[]).forEach(function(b){if(skip.test(b.n))return;var p=pl(b.n);p.mm[hi]=1;p.w+=b.w;p.bb+=b.b;p.rc+=b.r});
  })})});
+ var all=Object.keys(P).map(function(k){return P[k]});
  function top(f,t){
-  var a=Object.keys(P).map(function(k){return P[k]}).filter(function(p){return p[f]>0}).sort(function(a,b){return b[f]-a[f]}).slice(0,5);
+  var a=all.filter(function(p){return p[f]>0}).sort(function(a,b){return b[f]-a[f]}).slice(0,5);
   return'<div class="card"><h2>'+t+'</h2>'+(a.length?a.map(function(p,k){return'<div class="hist"><span>'+(k+1)+'. '+esc(p.n)+'</span><b>'+p[f]+'</b></div>'}).join(''):'<div class="meta">No data yet</div>')+'</div>';
  }
- app.innerHTML='<div class="top"><h1>Leaderboard</h1><button class="ghost" id="bk">Back</button></div>'+top('r','Top scorers (runs)')+top('w','Most wickets')+top('s6','Most sixes')+'<div class="meta">Counts only matches saved with full scorecards. Default names (Batsman 1, Bowler 1) are skipped.</div>';
+ var rows=all.slice().sort(function(a,b){return b.r-a.r||b.w-a.w}).map(function(p){
+  var sr=p.b?(p.r*100/p.b).toFixed(0):'-',avg=p.out?(p.r/p.out).toFixed(1):(p.inn?'-':'-'),eco=p.bb?(p.rc*6/p.bb).toFixed(1):'-',hs=p.hs>=0?p.hs+(p.hsno?'*':''):'-';
+  var td='padding:7px 4px;border-top:1px solid var(--line)';
+  return'<tr><td style="'+td+'"><b>'+esc(p.n)+'</b></td><td style="'+td+'">'+Object.keys(p.mm).length+'</td><td style="'+td+'">'+p.r+'</td><td style="'+td+'">'+sr+'</td><td style="'+td+'">'+avg+'</td><td style="'+td+'">'+hs+'</td><td style="'+td+'">'+p.w+'</td><td style="'+td+'">'+eco+'</td></tr>';
+ }).join('');
+ app.innerHTML='<div class="top"><h1>Leaderboard</h1><button class="ghost" id="bk">Back</button></div>'+top('r','Top scorers (runs)')+top('w','Most wickets')+top('s6','Most sixes')+
+ '<div class="card" style="overflow-x:auto"><h2>Player stats</h2>'+(rows?'<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px"><tr style="text-align:left;color:var(--mute)"><th>Player</th><th>M</th><th>Runs</th><th>SR</th><th>Avg</th><th>HS</th><th>Wkts</th><th>Eco</th></tr>'+rows+'</table><div class="meta">M matches, SR strike rate, Avg runs per dismissal, HS best score (* not out), Eco runs per over</div>':'<div class="meta">No data yet</div>')+'</div>'+
+ '<div class="meta">Counts only matches saved with full scorecards. Default names (Batsman 1, Bowler 1) are skipped.</div>';
  document.getElementById('bk').onclick=home;
 }
 
@@ -517,6 +576,8 @@ function watch(code){
    (tgt?'<div class="target">Need '+Math.max(tgt-i.r,0)+' off '+bl+' balls</div>':'')+
    '<div class="ov">'+i.ball.map(function(t){return'<div class="b '+(/^W(\+|$)/.test(t)?'w':(/^(Wd|Nb|B|LB)/.test(t)?'x':''))+'">'+t+'</div>'}).join('')+'</div>'+bats+bw+'</div>';
   }
+  var cm=(M.cm||[]).slice().reverse().slice(0,20);
+  if(cm.length)h+='<div class="card"><h2>Commentary</h2>'+cm.map(function(c){return'<div class="hist"><span style="min-width:44px;color:var(--mute)">'+esc(c.o||'')+'</span><span style="flex:1">'+(/!/.test(c.t)?'<b>'+esc(c.t)+'</b>':esc(c.t))+'</span></div>'}).join('')+'</div>';
   M.inn.forEach(function(x){if(x.bs.length)h+=sheet(M,x)});
   app.innerHTML=h;
  }
@@ -526,8 +587,32 @@ function watch(code){
  draw(null);poll();setInterval(poll,3000);
 }
 
+/* ---------- Resume screen (match already running when app opens) ---------- */
+var resumePrompt=!!(m&&!m.done);
+function shareLive(){
+ if(!m.live){m.live=Math.random().toString(36).slice(2,7).toUpperCase();save()}
+ share('Watch live: '+m.t[0]+' v '+m.t[1]+'\n'+LIVE_URL+'?c='+m.live);
+}
+function resume(){
+ var i=m.inn[m.cur],tgt=m.cur==1?m.inn[0].r+1:0,started=!i.op;
+ app.innerHTML='<div class="top"><h1>Match in progress</h1></div>'+
+ '<div class="card"><div class="meta">'+esc(m.t[0])+' v '+esc(m.t[1])+' &middot; '+(m.so?'Super Over '+m.so:'Innings '+(m.cur+1))+'</div>'+
+ (started?'<div class="meta"><b>'+esc(m.t[i.bat])+'</b> batting</div><div class="score">'+i.r+'<small>/'+i.w+'</small></div><div class="meta">Overs '+overs(i.b)+' of '+m.ov+'</div>'+(tgt?'<div class="target">Need '+Math.max(tgt-i.r,0)+' off '+(m.ov*6-i.b)+' balls</div>':''):'<div class="meta">'+esc(m.t[i.bat])+' to bat, innings not started yet</div>')+
+ (m.cur==1?'<div class="meta">'+esc(m.t[m.inn[0].bat])+' scored '+m.inn[0].r+'/'+m.inn[0].w+'</div>':'')+
+ '<div class="meta" style="margin-top:12px">Live match ID: <b>'+(m.live?esc(m.live):'not live')+'</b></div></div>'+
+ '<button class="big" id="rc">Continue match</button>'+
+ '<button class="big alt" id="rl">'+(m.live?'Share live link':'Go live and share')+'</button>'+
+ '<button class="big alt" id="rn">Start new match</button>';
+ document.getElementById('rc').onclick=function(){resumePrompt=false;render()};
+ document.getElementById('rl').onclick=function(){shareLive();resume()};
+ document.getElementById('rn').onclick=function(){
+  if(confirm('Start a new match? The running match will be removed from this phone.')){
+   m=null;undo=[];pend=null;rm(KEY_M);rm('gully_undo');resumePrompt=false;render()}};
+}
+
 function render(){
  if(!m)return home();
+ if(resumePrompt&&!m.done)return resume();
  if(m.done)return result();
  score();
 }
