@@ -16,7 +16,7 @@ h1{font-size:30px}h2{font-size:22px;margin-bottom:6px}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .card{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
-input[type=text],input[type=number],textarea{width:100%;padding:12px;font-size:16px;border:1.5px solid var(--line);border-radius:10px;background:var(--wall);color:var(--ink);font-family:inherit}
+input[type=text],input[type=number],input[type=datetime-local],textarea{width:100%;padding:12px;font-size:16px;border:1.5px solid var(--line);border-radius:10px;background:var(--wall);color:var(--ink);font-family:inherit}
 textarea{min-height:90px}
 .row{display:flex;gap:10px}.row>*{flex:1}
 .chk{display:flex;align-items:center;gap:10px;font-size:15px;margin:10px 0}
@@ -131,12 +131,14 @@ function dis(x){
 /* ---------- Home / setup ---------- */
 function home(){
  var h=ld(KEY_H,[]);
- app.innerHTML='<div class="top"><h1>Gully Cricket</h1></div><div id="lvl"></div>'+
+ app.innerHTML='<div class="top"><h1>Gully Cricket</h1></div>'+
+ '<div class="card"><h2>Ongoing matches</h2><div id="onl"><div class="meta">Loading...</div></div><div style="margin-top:12px"><label>Resume your match (enter Match ID)</label><div class="row"><input type="text" id="rid" placeholder="Match ID" autocapitalize="characters"><button class="ghost" id="rbt">Resume</button></div></div></div>'+
+ '<div class="card"><h2>Upcoming matches</h2><div id="upl"><div class="meta">Loading...</div></div><button class="ghost" id="sch" style="margin-top:10px">Schedule a match</button></div>'+
  '<div class="card"><h2>New match</h2>'+
- '<div class="row"><div><label>Team A</label><input type="text" id="ta" placeholder="Team A name"></div><div><label>Team B</label><input type="text" id="tb" placeholder="Team B name"></div></div>'+
+ '<div class="row"><div><label>Team A</label><input type="text" id="ta" placeholder="Team A name" value="'+esc(pre?pre.a:'')+'"></div><div><label>Team B</label><input type="text" id="tb" placeholder="Team B name" value="'+esc(pre?pre.b:'')+'"></div></div>'+
  (Object.keys(teams()).length?'<div class="chips">'+Object.keys(teams()).map(function(n){return'<button data-tc="'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'')+
- '<div class="row"><div><label>Overs per side</label><input type="number" id="ov" value="6" min="1" max="50"></div>'+
- '<div><label>Players per side</label><input type="number" id="pl" value="6" min="2" max="11"></div></div>'+
+ '<div class="row"><div><label>Overs per side</label><input type="number" id="ov" value="'+(pre?pre.ov:6)+'" min="1" max="50"></div>'+
+ '<div><label>Players per side</label><input type="number" id="pl" value="'+(pre?pre.pl:6)+'" min="2" max="11"></div></div>'+
  '<label>Gully rules</label>'+
  '<div class="chk"><input type="checkbox" id="lm"><span>Last man bats (alone)</span></div>'+
  '<div class="chk"><input type="checkbox" id="fh" checked><span>Free hit after a no-ball</span></div>'+
@@ -144,15 +146,17 @@ function home(){
  '<div><label>No-ball adds</label><input type="number" id="nb" value="1" min="0" max="5"></div></div>'+
  '<button class="big" id="go">Next: Toss</button></div>'+
  '<div class="card"><h2>My teams</h2>'+(Object.keys(teams()).length?Object.keys(teams()).map(function(n){return'<div class="hist"><div><b>'+esc(n)+'</b><div class="meta">'+teams()[n].length+' players</div></div><button class="ghost" data-te="'+esc(n)+'">Edit</button></div>'}).join(''):'<div class="meta">No saved teams yet. Teams are saved automatically after a match, or add one here.</div>')+'<button class="ghost" id="tadd" style="margin-top:10px">Add team</button></div>'+
- (h.length?'<div class="card"><h2>Past matches</h2>'+h.map(function(x,i){return'<div class="hist"><div><b>'+esc(x.sum)+'</b><div class="meta">'+esc(x.date)+' &middot; '+esc(x.res)+'</div></div><div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-o="'+i+'">Open</button><button class="ghost" data-i="'+i+'">Share</button></div></div>'}).join('')+
- '<button class="ghost" id="lbd" style="margin-top:10px">Leaderboard</button> <button class="ghost" id="exp" style="margin-top:10px">Backup history</button> <button class="ghost" id="clr" style="margin-top:10px">Clear</button></div>':'');
+ '<div class="card"><h2>Past matches</h2><div id="rsl"></div>'+(h.length?h.map(function(x,i){return'<div class="hist"><div><b>'+esc(x.sum)+'</b><div class="meta">'+esc(x.date)+' &middot; '+esc(x.res)+'</div></div><div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-o="'+i+'">Open</button><button class="ghost" data-i="'+i+'">Share</button></div></div>'}).join('')+
+ '<button class="ghost" id="lbd" style="margin-top:10px">Leaderboard</button> <button class="ghost" id="exp" style="margin-top:10px">Backup history</button> <button class="ghost" id="clr" style="margin-top:10px">Clear</button>':'<div class="meta">No saved matches on this phone yet.</div>')+'</div>';
  document.getElementById('go').onclick=function(){
   var g=function(i){return document.getElementById(i).value},c=function(i){return document.getElementById(i).checked};
   var pl=Math.min(11,Math.max(2,+g('pl')||6));
   var cfg={v:3,t:[g('ta').trim()||'Team A',g('tb').trim()||'Team B'],ov:Math.max(1,+g('ov')||6),pl:pl,
-   lm:c('lm'),fh:c('fh'),wd:+g('wd')||0,nb:+g('nb')||0,cur:0,done:false,res:''};
+   lm:c('lm'),fh:c('fh'),wd:+g('wd')||0,nb:+g('nb')||0,cur:0,done:false,res:'',up:(pre&&pre.up)||''};
   toss(cfg)};
- fillLive();
+ fillLive();fillUp();
+ document.getElementById('rbt').onclick=function(){resumeById(document.getElementById('rid').value)};
+ document.getElementById('sch').onclick=schedule;
  app.querySelectorAll('[data-tc]').forEach(function(b){b.onclick=function(){var a=document.getElementById('ta'),c=document.getElementById('tb');(a.value.trim()?c:a).value=b.dataset.tc}});
  app.querySelectorAll('[data-te]').forEach(function(b){b.onclick=function(){teamEdit(b.dataset.te)}});
  document.getElementById('tadd').onclick=function(){teamEdit('')};
@@ -193,7 +197,9 @@ function toss(cfg){
    var W=cfg.t[w],fc=face?'TAILS':'HEADS';
    app.innerHTML='<div class="top"><h1>Toss</h1></div><div class="card" style="text-align:center"><div class="coin">'+fc+'</div><h2>'+esc(W)+' won the toss</h2><div class="meta">Choose to</div><div class="row"><button class="big" id="bt">Bat first</button><button class="big" id="bl">Bowl first</button></div></div>';
    function go(bat){var first=bat?w:1-w;cfg.first=first;cfg.toss=W+' won the toss and chose to '+(bat?'bat':'bowl');
-    cfg.inn=[mkInn(first),mkInn(1-first)];m=cfg;undo=[];save();render()}
+    cfg.inn=[mkInn(first),mkInn(1-first)];
+    if(cfg.up){try{fetch(DB+'/upcoming/'+cfg.up+'.json',{method:'DELETE'}).catch(function(){})}catch(e){}}
+    delete cfg.up;pre=null;m=cfg;undo=[];save();render()}
    document.getElementById('bt').onclick=function(){go(1)};
    document.getElementById('bl').onclick=function(){go(0)};
   },1300);
@@ -408,10 +414,10 @@ function finish(s){
  if(motmTxt(m))setTimeout(function(){snd('M')},700);
  var h=ld(KEY_H,[]);
  var cp=JSON.parse(JSON.stringify(m));delete cp.hbak;delete cp.cm;
- var txt=(m.so?m.sum0+'\n\n':'')+summary(m);
+ var txt=(m.so?(m.sum0||'')+'\n\n':'')+summary(m);
  if(m.so&&h.length){
   m.hbak=JSON.stringify(h[0]);
-  var o=h[0];o.res=m.mres+' → Super Over: '+m.res;o.text=txt;o.ms=(o.ms||[]).concat([cp]);
+  var o=h[0];o.res=(m.mres||'Match tied')+' → Super Over: '+m.res;o.text=txt;o.ms=(o.ms||[]).concat([cp]);
  }else{
   h.unshift({sum:A+' '+a.r+'/'+a.w+' v '+B+' '+b.r+'/'+b.w,res:m.res,date:new Date().toLocaleDateString(),text:txt,ms:[cp]});
  }
@@ -619,15 +625,63 @@ function openShare(){
  document.getElementById('bkl').onclick=function(){render()};
 }
 var lvT=null;
+var pre=null;
+function evList(o){return Object.keys(o||{}).map(function(k){var x=o[k];if(x&&typeof x=='object')x.c=k;return x}).filter(function(x){return x&&x.a&&x.b})}
 function fillLive(){
- var el=document.getElementById('lvl');if(!el)return;
+ if(!document.getElementById('onl')&&!document.getElementById('rsl'))return;
  fetch(DB+'/live_index.json?orderBy=%22ts%22&startAt='+(Date.now()-43200000)).then(function(r){return r.json()}).then(function(o){
-  el=document.getElementById('lvl');if(!el)return;
-  var a=Object.keys(o||{}).map(function(k){var x=o[k];if(x&&typeof x=='object')x.c=k;return x}).filter(function(x){return x&&x.a&&x.b}).sort(function(a,b){return b.ts-a.ts});
-  el.innerHTML=a.length?'<div class="card"><h2>Live matches</h2>'+a.map(function(x){return'<div class="hist"><div><b>'+esc(x.a)+' v '+esc(x.b)+'</b><div class="meta">'+(x.d?'Final: ':'')+esc(x.s||'')+(x.d?'':' &middot; '+esc(x.x||''))+'</div></div><button class="ghost" data-w="'+esc(x.c)+'">Watch</button></div>'}).join('')+'</div>':'';
-  el.querySelectorAll('[data-w]').forEach(function(b){b.onclick=function(){watch(b.dataset.w,true)}});
+  var el=document.getElementById('onl'),rl=document.getElementById('rsl');
+  var a=evList(o).sort(function(a,b){return b.ts-a.ts}),on=a.filter(function(x){return !x.d}),fin=a.filter(function(x){return x.d});
+  function row(x,btn){return'<div class="hist"><div><b>'+esc(x.a)+' v '+esc(x.b)+'</b><div class="meta">'+(x.d?'Final: ':'')+esc(x.s||'')+(x.d?'':' &middot; '+esc(x.x||''))+'</div></div><button class="ghost" data-w="'+esc(x.c)+'">'+btn+'</button></div>'}
+  if(el)el.innerHTML=on.length?on.map(function(x){return row(x,'Watch')}).join(''):'<div class="meta">No live matches right now</div>';
+  if(rl)rl.innerHTML=fin.length?'<div class="meta" style="margin-bottom:4px">Recent results (all users)</div>'+fin.map(function(x){return row(x,'View')}).join('')+'<div class="meta" style="margin:10px 0 4px">On this phone</div>':'';
+  app.querySelectorAll('[data-w]').forEach(function(b){b.onclick=function(){watch(b.dataset.w,true)}});
   clearTimeout(lvT);lvT=setTimeout(fillLive,8000);
- }).catch(function(){});
+ }).catch(function(){var el=document.getElementById('onl');if(el)el.innerHTML='<div class="meta">Cannot load live matches (offline)</div>'});
+}
+function fillUp(){
+ fetch(DB+'/upcoming.json?orderBy=%22at%22&startAt='+(Date.now()-10800000)).then(function(r){return r.json()}).then(function(o){
+  var el=document.getElementById('upl');if(!el)return;
+  var a=evList(o).sort(function(a,b){return a.at-b.at});
+  el.innerHTML=a.length?a.map(function(x){
+   var when=new Date(x.at).toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+   return'<div class="hist"><div><b>'+esc(x.a)+' v '+esc(x.b)+'</b><div class="meta">'+esc(when)+' &middot; '+(x.ov||6)+' overs'+(x.v?' &middot; '+esc(x.v):'')+'</div></div><div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-us="'+esc(x.c)+'">Start</button><button class="ghost" data-ud="'+esc(x.c)+'">Remove</button></div></div>'}).join(''):'<div class="meta">No upcoming matches</div>';
+  var map={};a.forEach(function(x){map[x.c]=x});
+  el.querySelectorAll('[data-us]').forEach(function(b){b.onclick=function(){var x=map[b.dataset.us];pre={a:x.a,b:x.b,ov:x.ov||6,pl:x.pl||6,up:x.c};home()}});
+  el.querySelectorAll('[data-ud]').forEach(function(b){b.onclick=function(){
+   if(confirm('Remove this upcoming match?'))fetch(DB+'/upcoming/'+b.dataset.ud+'.json',{method:'DELETE'}).then(function(){fillUp()}).catch(function(){toast('Could not remove')})}});
+ }).catch(function(){var el=document.getElementById('upl');if(el)el.innerHTML='<div class="meta">Cannot load upcoming matches (offline)</div>'});
+}
+function schedule(){
+ var d=new Date(Date.now()+3600000);d.setMinutes(0,0,0);
+ var pd=function(n){return(n<10?'0':'')+n};
+ var def=d.getFullYear()+'-'+pd(d.getMonth()+1)+'-'+pd(d.getDate())+'T'+pd(d.getHours())+':'+pd(d.getMinutes());
+ var nm=Object.keys(teams());
+ app.innerHTML='<div class="top"><h1>Schedule match</h1><button class="ghost" id="bk">Back</button></div>'+
+ '<div class="card"><div class="row"><div><label>Team A</label><input type="text" id="sa" placeholder="Team A name"></div><div><label>Team B</label><input type="text" id="sb" placeholder="Team B name"></div></div>'+
+ (nm.length?'<div class="chips">'+nm.map(function(n){return'<button data-sc="'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'')+
+ '<div class="row"><div><label>Overs per side</label><input type="number" id="so" value="6" min="1" max="50"></div><div><label>Players per side</label><input type="number" id="sp" value="6" min="2" max="11"></div></div>'+
+ '<label>Date and time</label><input type="datetime-local" id="sw" value="'+def+'"><label>Venue (optional)</label><input type="text" id="sv" placeholder="Ground or colony name">'+
+ '<button class="big" id="ssv">Schedule</button></div>';
+ document.getElementById('bk').onclick=home;
+ app.querySelectorAll('[data-sc]').forEach(function(b){b.onclick=function(){var a=document.getElementById('sa'),c=document.getElementById('sb');(a.value.trim()?c:a).value=b.dataset.sc}});
+ document.getElementById('ssv').onclick=function(){
+  var g=function(i){return document.getElementById(i).value};
+  var at=new Date(g('sw')).getTime();
+  if(!at||isNaN(at)){toast('Pick date and time');return}
+  var id=Math.random().toString(36).slice(2,7).toUpperCase();
+  fetch(DB+'/upcoming/'+id+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({a:g('sa').trim()||'Team A',b:g('sb').trim()||'Team B',ov:Math.max(1,+g('so')||6),pl:Math.min(11,Math.max(2,+g('sp')||6)),at:at,v:g('sv').trim(),ts:Date.now()})})
+   .then(function(r){if(!r.ok)throw 0;toast('Match scheduled');home()}).catch(function(){toast('Could not schedule. Check internet and rules')});
+ };
+}
+function resumeById(c){
+ c=(c||'').trim().toUpperCase();
+ if(c.length<4){toast('Enter the Match ID');return}
+ fetch(DB+'/live/'+c+'.json').then(function(r){return r.json()}).then(function(d){
+  if(!d||!d.inn){toast('Match not found');return}
+  if(d.done){toast('That match is already finished');return}
+  m=norm(d);m.live=c;m.v=3;undo=[];pend=null;rsOpen=false;resumePrompt=false;save();render();toast('Match resumed');
+ }).catch(function(){toast('No internet')});
 }
 function shareLive(){
  if(!m.live){m.live=Math.random().toString(36).slice(2,7).toUpperCase();save()}
@@ -642,7 +696,7 @@ function resume(){
  '<div class="meta" style="margin-top:12px">Live match ID: <b>'+(m.live?esc(m.live):'not live')+'</b></div></div>'+
  '<button class="big" id="rc">Continue match</button>'+
  '<button class="big alt" id="rl">'+(m.live?'Share live link / QR':'Go live and share')+'</button>'+
- '<button class="big alt" id="rn">Start new match</button><div id="lvl" style="margin-top:14px"></div>';
+ '<button class="big alt" id="rn">Start new match</button><div class="card" style="margin-top:14px"><h2>Ongoing matches</h2><div id="onl"></div></div>';
  document.getElementById('rc').onclick=function(){resumePrompt=false;render()};
  document.getElementById('rl').onclick=openShare;
  fillLive();
