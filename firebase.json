@@ -1,1 +1,1 @@
-{"hosting":{"public":"www"}}
+{"hosting":{"public":"www","headers":[{"source":"**","headers":[{"key":"Cache-Control","value":"no-cache"}]}]}}
