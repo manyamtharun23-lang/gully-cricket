@@ -84,6 +84,8 @@ function vib(p){try{if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
 function keep(){try{if(navigator.wakeLock&&!wl)navigator.wakeLock.request('screen').then(function(l){wl=l;l.addEventListener('release',function(){wl=null})}).catch(function(){})}catch(e){}}
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&m&&!m.done)keep()});
 function hp(p,id){var s=String(p)+'|'+id,h=5381;for(var k=0;k<s.length;k++)h=((h<<5)+h+s.charCodeAt(k))|0;return String(h)}
+function dev(){var d=ld('gully_dev',null);if(!d){d=Math.random().toString(36).slice(2,10);sv('gully_dev',d)}return d}
+function newLive(o){o.live=Math.random().toString(36).slice(2,7).toUpperCase();o.pin=String(1000+Math.floor(Math.random()*9000));o.ph=hp(o.pin,o.live)}
 function keepId(o,n){if(o.live)n.live=o.live;if(o.pin)n.pin=o.pin;if(o.ph)n.ph=o.ph}
 
 /* ---------- Sounds (mp3 files in the sounds folder) ---------- */
@@ -215,7 +217,7 @@ function toss(cfg){
    var W=cfg.t[w],fc=face?'TAILS':'HEADS';
    app.innerHTML='<div class="top"><h1>Toss</h1></div><div class="card" style="text-align:center"><div class="coin">'+fc+'</div><h2>'+esc(W)+' won the toss</h2><div class="meta">Choose to</div><div class="row"><button class="big" id="bt">Bat first</button><button class="big" id="bl">Bowl first</button></div></div>';
    function go(bat){var first=bat?w:1-w;cfg.first=first;cfg.toss=W+' won the toss and chose to '+(bat?'bat':'bowl');
-    cfg.inn=[mkInn(first),mkInn(1-first)];
+    cfg.inn=[mkInn(first),mkInn(1-first)];newLive(cfg);
     if(cfg.up){try{fetch(DB+'/upcoming/'+cfg.up+'.json',{method:'DELETE'}).catch(function(){})}catch(e){}}
     delete cfg.up;m=cfg;undo=[];save();render()}
    $('bt').onclick=function(){go(1)};
@@ -646,7 +648,7 @@ function openShare(){
  $('cpl').onclick=function(){copyText(url)};
  $('bkl').onclick=function(){render()};
 }
-var lvT=null;
+var lvT=null,upT=null;
 function evList(o){return Object.keys(o||{}).map(function(k){var x=o[k];if(x&&typeof x=='object')x.c=k;return x}).filter(function(x){return x&&x.a&&x.b})}
 function fillLive(){
  if(!$('onl')&&!$('rsl'))return;
@@ -667,13 +669,14 @@ function fillUp(){
   var a=evList(o).sort(function(a,b){return a.at-b.at}),now=Date.now();
   el.innerHTML=a.length?a.map(function(x){
    var when=new Date(x.at).toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
-   return'<div class="hist"><div><b>'+esc(x.a)+' v '+esc(x.b)+'</b><div class="meta">'+esc(when)+' &middot; '+(x.ov||6)+' overs'+(x.v?' &middot; '+esc(x.v):'')+(x.h?' &middot; Host: '+esc(x.h):'')+'</div>'+(x.at<now?'<div class="meta" style="color:var(--wkt)">Time passed, not started yet</div>':'')+'</div><div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-us="'+esc(x.c)+'">Start</button><button class="ghost" data-ud="'+esc(x.c)+'">Remove</button></div></div>'}).join(''):'<div class="meta">No upcoming matches</div>';
+   var own=!x.o||x.o===dev();return'<div class="hist"><div><b>'+esc(x.a)+' v '+esc(x.b)+'</b><div class="meta">'+esc(when)+' &middot; '+(x.ov||6)+' overs'+(x.v?' &middot; '+esc(x.v):'')+(x.h?' &middot; Host: '+esc(x.h):'')+'</div>'+(x.at<now?'<div class="meta" style="color:var(--wkt)">Time passed, not started yet</div>':'')+'</div>'+(own?'<div style="display:flex;gap:6px;align-items:flex-start"><button class="ghost" data-us="'+esc(x.c)+'">Start</button><button class="ghost" data-ud="'+esc(x.c)+'">Remove</button></div>':'<div class="meta" style="text-align:right">Only the host can start</div>')+'</div>'}).join(''):'<div class="meta">No upcoming matches</div>';
   var map={};a.forEach(function(x){map[x.c]=x});
   el.querySelectorAll('[data-us]').forEach(function(b){b.onclick=function(){
    var x=map[b.dataset.us],R=ld('gully_rules',{lm:false,fh:true,wd:1,nb:1});
    toss({v:3,t:[(draft.a||'').trim()||x.a,(draft.b||'').trim()||x.b],ov:x.ov||6,pl:x.pl||6,lm:!!R.lm,fh:R.fh!==false,wd:R.wd==null?1:R.wd,nb:R.nb==null?1:R.nb,cur:0,done:false,res:'',up:x.c,host:x.h||ld('gully_host','')})}});
   el.querySelectorAll('[data-ud]').forEach(function(b){b.onclick=function(){
    if(confirm('Remove this upcoming match?'))fetch(DB+'/upcoming/'+b.dataset.ud+'.json',{method:'DELETE'}).then(function(){fillUp()}).catch(function(){toast('Could not remove')})}});
+ clearTimeout(upT);upT=setTimeout(fillUp,10000);
  }).catch(function(){var el=$('upl');if(el)el.innerHTML='<div class="meta">Cannot load upcoming matches (offline)</div>'});
 }
 function schedule(){
@@ -694,7 +697,7 @@ function schedule(){
   var at=new Date(g('sw')).getTime();
   if(!at||isNaN(at)){toast('Pick date and time');return}
   var id=Math.random().toString(36).slice(2,7).toUpperCase();
-  fetch(DB+'/upcoming/'+id+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({a:g('sa').trim()||'Team A',b:g('sb').trim()||'Team B',ov:Math.max(1,+g('so')||6),pl:Math.min(11,Math.max(2,+g('sp')||6)),at:at,v:g('sv').trim(),h:g('sh').trim(),ts:Date.now()})})
+  fetch(DB+'/upcoming/'+id+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({a:g('sa').trim()||'Team A',b:g('sb').trim()||'Team B',ov:Math.max(1,+g('so')||6),pl:Math.min(11,Math.max(2,+g('sp')||6)),at:at,v:g('sv').trim(),h:g('sh').trim(),o:dev(),ts:Date.now()})})
    .then(function(r){if(!r.ok)throw 0;toast('Match scheduled');tab='up';home()}).catch(function(){toast('Could not schedule. Check internet and rules')});
  };
 }
