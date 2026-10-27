@@ -72,7 +72,7 @@ details div{font-size:14px;padding:3px 0}
 (function(){
 var KEY_M='gully_match',KEY_H='gully_history';
 var DB='https://gully-cricket-6e23c-default-rtdb.asia-southeast1.firebasedatabase.app',LIVE_URL='https://gully-cricket-6e23c.web.app/';
-var FBKEY='AIzaSyA77rYbh3TCYz0RwZk-3LDiw1_GStunisc',AUTH=ld0('gully_auth'),PROF=null,lmode='in';
+var FBKEY='AIzaSyA77rYbh3TCYz0RwZk-3LDiw1_GStunisc',AUTH=ld0('gully_auth'),PROF=ld0('gully_prof'),lmode='in';
 function ld0(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
 var app=document.getElementById('app'),m=null,undo=[],wl=null,rsOpen=false,pend=null,AC=null,tab='live',draft={a:'',b:''};
 function $(i){return document.getElementById(i)}
@@ -198,8 +198,22 @@ function home(){
 function teamEdit(old){
  var t=teams(),list=old?(t[old]||[]):[];
  app.innerHTML='<div class="top"><h1>'+(old?'Edit team':'New team')+'</h1><button class="ghost" id="bk">Back</button></div>'+
- '<div class="card"><label>Team name</label><input type="text" id="tn" value="'+esc(old)+'"><label>Players (one per line)</label><textarea id="tp" style="min-height:200px">'+esc(list.join('\n'))+'</textarea>'+
+ '<div class="card"><label>Team name</label><input type="text" id="tn" value="'+esc(old)+'">'+
+ '<label>Players with accounts (tap to add)</label><div class="chips" id="tpr"></div><button class="ghost" id="tall" style="margin-top:8px">Add all registered players</button>'+
+ '<label>Player without an account</label><div class="row"><input type="text" id="tpn" placeholder="Type a name"><button class="ghost" id="tpa">Add</button></div>'+
+ '<label>Team players (one per line)</label><textarea id="tp" style="min-height:200px">'+esc(list.join('\n'))+'</textarea>'+
  '<button class="big" id="ts">Save team</button>'+(old?'<button class="big alt" id="td">Delete team</button>':'')+'</div>';
+ function have(){var h={};$('tp').value.split(/[\n,]+/).forEach(function(x){x=x.trim().toLowerCase();if(x)h[x]=1});return h}
+ function addP(n){n=String(n).trim();if(!n||have()[n.toLowerCase()])return;var ta=$('tp');ta.value=(ta.value.trim()?ta.value.replace(/\s+$/,'')+'\n':'')+n;chips()}
+ function chips(){
+  var h=have(),a=(PROF||[]).filter(function(n){return !h[n.toLowerCase()]});
+  $('tpr').innerHTML=a.length?a.map(function(n){return'<button data-pa="'+esc(n)+'">'+esc(n)+' &#10003;</button>'}).join(''):'<div class="meta">'+((PROF&&PROF.length)?'All registered players are added':'No registered players loaded yet')+'</div>';
+  $('tpr').querySelectorAll('[data-pa]').forEach(function(b){b.onclick=function(){addP(b.dataset.pa)}});
+ }
+ chips();loadProf(function(){if($('tpr'))chips()});
+ $('tp').oninput=chips;
+ $('tall').onclick=function(){(PROF||[]).forEach(addP)};
+ $('tpa').onclick=function(){addP($('tpn').value);$('tpn').value=''};
  $('bk').onclick=home;
  $('ts').onclick=function(){
   var name=$('tn').value.trim();
@@ -273,9 +287,10 @@ function roster(t){
  return out;
 }
 function sugg(t,used,att){
- var u=used.map(function(n){return n.toLowerCase()});
+ var u=used.map(function(n){return n.toLowerCase()}),reg={};
+ (PROF||[]).forEach(function(n){reg[n.toLowerCase()]=1});
  var seen={},a=roster(t).concat(PROF||[]).filter(function(n){var k=n.toLowerCase();if(seen[k]||u.indexOf(k)>=0)return false;seen[k]=1;return true});
- return a.length?'<div class="chips">'+a.map(function(n){return'<button data-'+att+'="'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>':'';
+ return a.length?'<div class="chips">'+a.map(function(n){return'<button data-'+att+'="'+esc(n)+'">'+esc(n)+(reg[n.toLowerCase()]?' &#10003;':'')+'</button>'}).join('')+'</div><div class="meta">&#10003; means the player has an account. Others can be typed.</div>':'';
 }
 function score(){
  keep();
@@ -603,7 +618,7 @@ function friendly(e){
  if(t=='db')return'Could not save. Check the database rules.';
  return'Something went wrong. Check internet and try again.';
 }
-function loadProf(){dbGet('/profiles').then(function(P){PROF=Object.keys(P||{}).map(function(u){return P[u].n}).filter(Boolean)}).catch(function(){})}
+function loadProf(cb){dbGet('/profiles').then(function(P){PROF=Object.keys(P||{}).map(function(u){return P[u].n}).filter(Boolean);sv('gully_prof',PROF);if(cb)cb()}).catch(function(){if(cb)cb()})}
 function sumStats(o){
  var t={m:0,r:0,b:0,x4:0,x6:0,w:0,rc:0,bb:0,mom:0,hs:0},M=(o&&o.m)||{};
  Object.keys(M).forEach(function(k){var x=M[k];t.m++;['r','b','x4','x6','w','rc','bb','mom'].forEach(function(f){t[f]+=(x[f]||0)});if((x.r||0)>t.hs)t.hs=x.r});
@@ -649,8 +664,8 @@ function fillMe(){
   '<div class="meta">Stats update when a logged-in host finishes a match and your name is spelled the same.</div></div>'+
   '<button class="big alt" id="pe">Edit profile</button><button class="big alt" id="lo">Log out</button>';
   $('pe').onclick=function(){profileForm(p)};
-  $('lo').onclick=function(){AUTH=null;rm('gully_auth');home()};
- }).catch(function(){if($('mex'))box.innerHTML='<div class="card"><div class="meta">Could not load profile. Check internet.</div><button class="big alt" id="lo">Log out</button></div>';var l=$('lo');if(l)l.onclick=function(){AUTH=null;rm('gully_auth');home()}});
+  $('lo').onclick=function(){AUTH=null;rm('gully_auth');render()};
+ }).catch(function(){if($('mex'))box.innerHTML='<div class="card"><div class="meta">Could not load profile. Check internet.</div><button class="big alt" id="lo">Log out</button></div>';var l=$('lo');if(l)l.onclick=function(){AUTH=null;rm('gully_auth');render()}});
 }
 function profileForm(p){
  var box=$('mex');
@@ -666,7 +681,7 @@ function loginForm(){
  (up?profFields(null):'')+
  '<label>Email</label><input type="email" id="le" autocapitalize="none"><label>Password</label><input type="password" id="lp">'+
  '<button class="big" id="lg">'+(up?'Create account':'Login')+'</button>'+(up?'':'<button class="ghost" id="fp" style="margin-top:10px">Forgot password</button>')+
- '<div class="meta">Watching matches does not need login. Login is for your player profile and stats.</div></div>';
+ '<div class="meta">You need an account to use the app. Watching a shared live link does not need login.</div></div>';
  $('mi').onclick=function(){lmode='in';loginForm()};$('mu').onclick=function(){lmode='up';loginForm()};
  var go=function(){
   var em=$('le').value.trim(),pw=$('lp').value;
@@ -674,10 +689,10 @@ function loginForm(){
   if(up){
    var d=readProf();if(!d.n){toast('Enter your name');return}
    authCall('signUp',{email:em,password:pw,returnSecureToken:true}).then(function(r){setAuth(r);return dbPut('/profiles/'+AUTH.uid,d)})
-    .then(function(){sv('gully_host',d.n);loadProf();tab='me';home();toast('Account created')}).catch(function(e){toast(friendly(e))});
+    .then(function(){sv('gully_host',d.n);loadProf();tab='live';render();toast('Account created')}).catch(function(e){toast(friendly(e))});
   }else{
    authCall('signInWithPassword',{email:em,password:pw,returnSecureToken:true}).then(function(r){setAuth(r);return dbGet('/profiles/'+AUTH.uid)})
-    .then(function(p){if(p&&p.n)sv('gully_host',p.n);tab='me';home();toast('Logged in')}).catch(function(e){toast(friendly(e))});
+    .then(function(p){if(p&&p.n)sv('gully_host',p.n);tab='live';render();toast('Logged in')}).catch(function(e){toast(friendly(e))});
   }
  };
  $('lg').onclick=go;
@@ -857,7 +872,12 @@ function resume(){
    m=null;undo=[];pend=null;rm(KEY_M);rm('gully_undo');resumePrompt=false;render()}};
 }
 
+function gate(){
+ app.innerHTML='<div class="top"><h1>Gully Cricket</h1></div><div class="meta" style="margin-bottom:10px">Login to use the app. Watching a shared live link does not need login.</div><div id="mex"></div>';
+ loginForm();
+}
 function render(){
+ if(!AUTH&&!wc&&FBKEY.indexOf('PASTE')!==0)return gate();
  if(!m)return home();
  if(resumePrompt&&!m.done)return resume();
  if(m.done)return result();
