@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#1c2530">
+<meta name="theme-color" content="#0b1320">
 <title>Gully Cricket Score</title>
 <style>
 :root{--ink:#1c2530;--wall:#dfe5e8;--card:#f7f9fa;--ball:#e4e12a;--wkt:#d6372b;--mute:#5d6b78;--line:#b9c4cb}
@@ -57,12 +57,83 @@ button{font:inherit;cursor:pointer;border:0;border-radius:12px;color:var(--ink)}
 .chips button,.pick .chips button{width:auto;margin:0;padding:8px 14px;font-size:14px;border-radius:20px;background:var(--wall);border:1.5px solid var(--line);text-align:center}
 .coin{width:130px;height:130px;border-radius:50%;background:var(--ball);color:#1c2530;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;margin:18px auto;border:4px solid var(--ink)}
 .coin.fl{animation:flip 1.2s ease-out}
+.stage{perspective:700px;height:180px;display:flex;align-items:center;justify-content:center;margin:6px 0}
+.stage.up{animation:tossup 1.4s ease-out}
+@keyframes tossup{0%{transform:translateY(0)}45%{transform:translateY(-70px) scale(1.25)}100%{transform:translateY(0) scale(1)}}
+.coin3d{position:relative;width:130px;height:130px;transform-style:preserve-3d;transition:transform 1.4s cubic-bezier(.2,.7,.2,1);cursor:pointer}
+.coin3d.bat{width:90px;height:150px}
+.cf{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;border-radius:50%;background:var(--ball);color:#1c2530;border:4px solid var(--ink);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.cf.b{transform:rotateX(180deg)}
+.coin3d.bat .cf{border-radius:14px;background:#d9b074;font-size:18px}
+.dice{width:92px;height:92px;margin:6px auto;border:4px solid var(--ink);border-radius:16px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:700;font-family:Impact,Haettenschweiler,sans-serif}
+@media (prefers-reduced-motion:reduce){.stage.up{animation:none}.coin3d{transition:none}}
 @keyframes flip{from{transform:rotateY(0)}to{transform:rotateY(1080deg)}}
 @media (prefers-reduced-motion:reduce){.coin.fl{animation:none}}
 .res{font-size:26px;margin:6px 0 10px}
 details{margin-top:12px}summary{cursor:pointer;font-size:15px;color:var(--mute)}
 details div{font-size:14px;padding:3px 0}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--wall);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9}
+/* ---------- Professional theme (overrides) ---------- */
+:root{--ink:#0f1b2d;--wall:#f2f5f9;--card:#ffffff;--ball:#22c55e;--wkt:#e5383b;--mute:#5b6b82;--line:#dbe2ec;--soft:rgba(34,197,94,.14);--acct:#15803d;--amb:#b45309;--redt:#c62828;--field:#f6f8fb;--shadow:0 1px 2px rgba(15,27,45,.06),0 8px 24px rgba(15,27,45,.06)}
+@media (prefers-color-scheme:dark){:root{--ink:#e8eef7;--wall:#0b1320;--card:#131f31;--mute:#8d9cb3;--line:#24344d;--soft:rgba(34,197,94,.16);--acct:#4ade80;--amb:#fbbf24;--redt:#f87171;--field:#0e1827;--shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 28px rgba(0,0,0,.35)}}
+html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{background:radial-gradient(900px 320px at 50% -120px,rgba(34,197,94,.13),transparent 70%) no-repeat,var(--wall);padding:16px 16px 56px}
+h1,h2{font-family:inherit;font-weight:800;letter-spacing:-.02em}
+h1{font-size:26px}
+h2{font-size:18px;margin-bottom:12px;letter-spacing:-.01em}
+.top{margin-bottom:14px;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand::before{content:"";width:30px;height:30px;flex:none;border-radius:50%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23dc2626'/%3E%3Cpath d='M7 6c5 5 5 15 0 20M25 6c-5 5-5 15 0 20' fill='none' stroke='%23fff' stroke-width='1.6' stroke-dasharray='2 2'/%3E%3C/svg%3E") center/contain no-repeat}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin:14px 0 6px}
+input[type=text],input[type=number],input[type=datetime-local],input[type=email],input[type=password],select,textarea{padding:13px 14px;font-size:16px;border:1px solid var(--line);border-radius:12px;background:var(--field);color:var(--ink);transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ball);box-shadow:0 0 0 3px rgba(34,197,94,.25)}
+input::placeholder,textarea::placeholder{color:var(--mute);opacity:.7}
+.chk input{accent-color:var(--ball)}
+button{transition:transform .08s,filter .15s,background .15s}
+button:active{transform:scale(.97)}
+.big{padding:15px;font-size:16px;font-weight:800;letter-spacing:.01em;border-radius:14px;background:var(--ball);color:#05200f;box-shadow:0 6px 16px rgba(34,197,94,.28);margin-top:12px}
+.big.alt,.alt{background:var(--card);border:1px solid var(--line);color:var(--ink);box-shadow:none}
+.ghost{border:1px solid var(--line);background:transparent;padding:8px 14px;font-size:13px;font-weight:700;border-radius:10px;color:var(--ink)}
+.nav{gap:6px;margin:0 -16px 10px;padding:8px 16px 10px;background:var(--wall);background:color-mix(in srgb,var(--wall) 90%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav button{padding:9px 15px;border-radius:999px;border:1px solid transparent;background:transparent;color:var(--mute);font-size:14px;font-weight:700}
+.nav button.on{background:var(--soft);color:var(--acct);border-color:rgba(34,197,94,.35)}
+.score{font-family:inherit;font-weight:800;font-size:74px;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.score small{font-size:28px;font-weight:700;letter-spacing:0;color:var(--mute)}
+.meta{font-size:14px}
+.target{margin-top:12px;padding:9px 12px;background:var(--soft);color:var(--acct);border:1px solid rgba(34,197,94,.35);border-radius:12px;font-weight:700;font-size:14px}
+.target.fh{background:rgba(229,56,59,.14);color:var(--redt);border-color:rgba(229,56,59,.4)}
+.ov{gap:8px;margin-top:14px}
+.b{background:var(--field);border:1px solid var(--line);font-weight:800}
+.b.w{background:var(--wkt);border-color:var(--wkt);color:#fff}
+.b.x{background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.5);color:var(--amb)}
+.pad{gap:10px}
+.pad button{height:64px;font-size:22px;font-weight:800;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.pad .f{color:#052014;border-color:transparent}
+.pad .f:nth-child(5){background:#38bdf8}
+.pad .f:nth-child(6){background:#f5b301}
+.pad .o{background:var(--wkt);border-color:transparent;color:#fff;font-size:18px;letter-spacing:.04em;box-shadow:0 6px 16px rgba(229,56,59,.3)}
+.pad .s{font-size:14px;font-weight:700;color:var(--ink)}
+.hist{padding:12px 0}
+.pick button{padding:14px;font-size:15px;font-weight:600;background:var(--field);border:1px solid var(--line);border-radius:12px;color:var(--ink)}
+.pick .big{background:var(--ball);border-color:transparent;font-weight:800;color:#05200f}
+.pick .sel{background:var(--soft);border-color:var(--ball);color:var(--acct)}
+.chips button,.pick .chips button{padding:8px 14px;font-size:13px;font-weight:700;border-radius:999px;background:var(--field);border:1px solid var(--line);color:var(--ink)}
+.coin,.cf{background:radial-gradient(circle at 35% 30%,#fff1a8,#f5b301 62%,#b97a00);color:#3a2500;border:4px solid #fcd34d}
+.coin3d.bat .cf{background:#d9b074;border-color:var(--ink)}
+.dice{font-family:inherit;border:2px solid var(--line);background:var(--card);box-shadow:var(--shadow)}
+.res{font-size:24px;font-weight:800;letter-spacing:-.02em}
+summary{font-weight:600}
+.toast{background:var(--ink);color:var(--wall);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-weight:600}
+.scorehead{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:12px}
+.scorehead b{font-size:18px;letter-spacing:-.01em}
+.tools{display:flex;gap:8px}
+.tools .ghost{flex:1;padding:8px 6px}
+.ghost.islive{background:rgba(229,56,59,.14);border-color:rgba(229,56,59,.5);color:var(--redt)}
+.ghost.islive::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:6px;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.ghost.islive::before{animation:none}}
 </style>
 </head>
 <body>
@@ -140,7 +211,7 @@ function dis(x){
 function home(){
  var h=ld(KEY_H,[]),T=teams(),tn=Object.keys(T);
  var tabs=[['live','Live'],['up','Upcoming'],['new','New match'],['pl','Players'],['me',AUTH?'Me':'Login'],['teams','My teams'],['past','Past']];
- var s='<div class="top"><h1>Gully Cricket</h1></div><div class="nav">'+tabs.map(function(t){return'<button data-tab="'+t[0]+'" class="'+(tab==t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</div>';
+ var s='<div class="top"><h1 class="brand">Gully Cricket</h1></div><div class="nav">'+tabs.map(function(t){return'<button data-tab="'+t[0]+'" class="'+(tab==t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</div>';
  if(tab=='live'){
   s+='<div class="card"><h2>Ongoing matches</h2><div id="onl"><div class="meta">Loading...</div></div></div>'+
   '<div class="card"><h2>Score from another phone</h2><div class="meta">Watching is open to everyone. Only the host can score. To take over scoring, enter the Match ID and the host PIN.</div>'+
@@ -226,28 +297,80 @@ function teamEdit(old){
 }
 
 /* ---------- Toss ---------- */
-function toss(cfg){
- var A=cfg.t[0];
- app.innerHTML='<div class="top"><h1>Toss</h1><button class="ghost" id="bk">Back</button></div><div class="card" style="text-align:center"><div class="meta">'+esc(A)+', call it</div><div class="coin" id="coin">?</div><div class="row"><button class="big" id="hd">Heads</button><button class="big" id="tl">Tails</button></div></div>';
- $('bk').onclick=function(){render()};
- function flip(call){
-  var coin=$('coin'),face=Math.random()<0.5?0:1,w=face==call?0:1;
-  $('hd').onclick=null;$('tl').onclick=null;
-  coin.textContent='';coin.className='coin fl';snd('C');setTimeout(function(){snd('D')},1000);
-  setTimeout(function(){
-   var W=cfg.t[w],fc=face?'TAILS':'HEADS';
-   app.innerHTML='<div class="top"><h1>Toss</h1></div><div class="card" style="text-align:center"><div class="coin">'+fc+'</div><h2>'+esc(W)+' won the toss</h2><div class="meta">Choose to</div><div class="row"><button class="big" id="bt">Bat first</button><button class="big" id="bl">Bowl first</button></div></div>';
-   function go(bat){var first=bat?w:1-w;cfg.first=first;cfg.toss=W+' won the toss and chose to '+(bat?'bat':'bowl');
-    cfg.inn=[mkInn(first),mkInn(1-first)];newLive(cfg);
-    if(cfg.up){try{fetch(DB+'/upcoming/'+cfg.up+'.json',{method:'DELETE'}).catch(function(){})}catch(e){}}
-    delete cfg.up;m=cfg;undo=[];save();render()}
-   $('bt').onclick=function(){go(1)};
-   $('bl').onclick=function(){go(0)};
-  },1300);
- }
- $('hd').onclick=function(){flip(0)};
- $('tl').onclick=function(){flip(1)};
+var tmode='coin',shk=null;
+function offShake(){if(shk){window.removeEventListener('devicemotion',shk);shk=null}}
+function onShake(fn){
+ offShake();var last=0;
+ shk=function(e){var a=e.accelerationIncludingGravity||e.acceleration;if(!a)return;
+  var g=Math.abs(a.x||0)+Math.abs(a.y||0)+Math.abs(a.z||0);
+  if(g>38&&Date.now()-last>1500){last=Date.now();fn()}};
+ window.addEventListener('devicemotion',shk);
 }
+function motionOk(){try{if(window.DeviceMotionEvent&&typeof DeviceMotionEvent.requestPermission=='function')DeviceMotionEvent.requestPermission().catch(function(){})}catch(e){}}
+function toss(cfg){
+ offShake();
+ var A=cfg.t[0],B=cfg.t[1],call=null,busy=false,names={coin:['Heads','Tails'],bat:['Flat','Round']};
+ var modes='<div class="chips" style="justify-content:center;margin:0 0 6px">'+[['coin','Coin'],['bat','Bat'],['dice','Dice']].map(function(x){return'<button data-tm="'+x[0]+'" style="'+(tmode==x[0]?'background:var(--ball);color:#1c2530;border-color:var(--ball)':'')+'">'+x[1]+'</button>'}).join('')+'</div>';
+ var head='<div class="top"><h1>Toss</h1><button class="ghost" id="bk">Back</button></div>';
+ function wire(){
+  $('bk').onclick=function(){offShake();render()};
+  app.querySelectorAll('[data-tm]').forEach(function(b){b.onclick=function(){tmode=b.dataset.tm;toss(cfg)}});
+ }
+ function won(w,label){
+  offShake();
+  var W=cfg.t[w];
+  app.innerHTML='<div class="top"><h1>Toss</h1></div><div class="card" style="text-align:center"><div class="coin">'+esc(label)+'</div><h2>'+esc(W)+' won the toss</h2><div class="meta">Choose to</div><div class="row"><button class="big" id="bt">Bat first</button><button class="big" id="bl">Bowl first</button></div></div>';
+  function go(bat){var first=bat?w:1-w;cfg.first=first;cfg.toss=W+' won the toss and chose to '+(bat?'bat':'bowl');
+   cfg.inn=[mkInn(first),mkInn(1-first)];newLive(cfg);
+   if(cfg.up){try{fetch(DB+'/upcoming/'+cfg.up+'.json',{method:'DELETE'}).catch(function(){})}catch(e){}}
+   delete cfg.up;m=cfg;undo=[];save();render()}
+  $('bt').onclick=function(){go(1)};
+  $('bl').onclick=function(){go(0)};
+ }
+ if(tmode=='dice'){
+  app.innerHTML=head+'<div class="card" style="text-align:center">'+modes+'<div class="meta">Both teams roll. The higher number wins.</div>'+
+   '<div class="row" style="margin:14px 0"><div><div class="meta">'+esc(A)+'</div><div class="dice" id="d1">?</div></div><div><div class="meta">'+esc(B)+'</div><div class="dice" id="d2">?</div></div></div>'+
+   '<button class="big" id="roll">Roll the dice</button><div class="meta">or shake your phone</div></div>';
+  wire();
+  var rnd=function(){return 1+Math.floor(Math.random()*6)};
+  var roll=function(){
+   if(busy)return;busy=true;snd('C');
+   var n=0,iv=setInterval(function(){
+    $('d1').textContent=rnd();$('d2').textContent=rnd();
+    if(++n>12){
+     clearInterval(iv);
+     var a=rnd(),b=rnd();$('d1').textContent=a;$('d2').textContent=b;
+     if(a==b){toast('Tie. Rolling again');setTimeout(function(){busy=false;roll()},900);return}
+     vib(60);setTimeout(function(){won(a>b?0:1,a+' v '+b)},900);
+    }},90);
+  };
+  $('roll').onclick=function(){motionOk();roll()};
+  onShake(roll);
+  return;
+ }
+ var isBat=tmode=='bat',nm=names[tmode];
+ app.innerHTML=head+'<div class="card" style="text-align:center">'+modes+'<div class="meta">'+esc(A)+', call it</div>'+
+  '<div class="stage"><div class="coin3d'+(isBat?' bat':'')+'" id="coin"><div class="cf">'+nm[0].toUpperCase()+'</div><div class="cf b">'+nm[1].toUpperCase()+'</div></div></div>'+
+  '<div class="row"><button class="big" id="c0">'+nm[0]+'</button><button class="big" id="c1">'+nm[1]+'</button></div>'+
+  '<div class="meta" id="hint">Pick your call</div></div>';
+ wire();
+ var flip=function(){
+  if(call===null){toast('Pick your call first');return}
+  if(busy)return;busy=true;offShake();
+  var face=Math.random()<0.5?0:1,w=face==call?0:1,c=$('coin'),st=c.parentNode;
+  $('c0').disabled=true;$('c1').disabled=true;$('hint').textContent='...';
+  snd('C');st.classList.remove('up');void st.offsetWidth;st.classList.add('up');
+  c.style.transform='rotateX('+(1800+face*180)+'deg)';
+  setTimeout(function(){vib(60);setTimeout(function(){won(w,nm[face].toUpperCase())},600)},1500);
+ };
+ [0,1].forEach(function(k){$('c'+k).onclick=function(){
+  call=k;motionOk();
+  $('c'+k).className='big';$('c'+(1-k)).className='big alt';
+  $('hint').textContent='Now tap the '+(isBat?'bat':'coin')+' or shake your phone';
+  onShake(flip)}});
+ $('coin').onclick=flip;
+}
+
 
 /* ---------- Scoring ---------- */
 function maxW(){return m.lm?m.pl:m.pl-1}
@@ -298,7 +421,7 @@ function score(){
  var tgt=m.cur==1?m.inn[0].r+1:0,left=tgt?tgt-i.r:0,bl=m.ov*6-i.b;
  var crr=i.b?(i.r*6/i.b).toFixed(2):'0.00';
  var snOn=ld('gully_snd',1);
- var head='<div class="top"><div><b>'+esc(m.t[i.bat])+'</b> batting<div class="meta">'+esc(m.t[1-i.bat])+' bowling &middot; '+(m.so?'Super Over '+m.so:'Innings '+(m.cur+1))+(m.host?' &middot; Host '+esc(m.host):'')+(m.live?' &middot; Live '+m.live:'')+'</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="ghost" id="lv">Live</button><button class="ghost" id="sn">Sound '+(snOn?'on':'off')+'</button><button class="ghost" id="menu">Menu</button></div></div>';
+ var head='<div class="top scorehead"><div><b>'+esc(m.t[i.bat])+'</b> batting<div class="meta">'+esc(m.t[1-i.bat])+' bowling &middot; '+(m.so?'Super Over '+m.so:'Innings '+(m.cur+1))+(m.host?' &middot; Host '+esc(m.host):'')+(m.live?' &middot; Live '+m.live:'')+'</div></div><div class="tools"><button class="ghost'+(m.live?' islive':'')+'" id="lv">Live</button><button class="ghost" id="sn">Sound '+(snOn?'on':'off')+'</button><button class="ghost" id="menu">Menu</button></div></div>';
  if(i.op){
   var lab=m.cur?'Start innings':'Start match';
   app.innerHTML=head+'<div class="card"><h2>'+lab+'</h2>'+(m.toss&&!m.cur?'<div class="meta">'+esc(m.toss)+'</div>':'')+(tgt?'<div class="target">Target: '+tgt+' runs</div>':'')+
@@ -527,12 +650,12 @@ function makeImage(M){
  var ht={t:110,res:90,m:66,h:90,r:54,s:60},H=60,W=1080,F='Arial, sans-serif';
  L.forEach(function(l){H+=ht[l[0]]});H+=40;
  var c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d'),y=60;
- x.fillStyle='#1c2530';x.fillRect(0,0,W,H);x.textAlign='left';
+ x.fillStyle='#0b1320';x.fillRect(0,0,W,H);x.textAlign='left';
  L.forEach(function(l){var t=l[0];
-  if(t=='t'){x.fillStyle='#e4e12a';x.font='bold 72px Impact, '+F;y+=70;x.fillText(l[1],60,y);y+=40}
+  if(t=='t'){x.fillStyle='#22c55e';x.font='bold 72px '+F;y+=70;x.fillText(l[1],60,y);y+=40}
   else if(t=='res'){x.fillStyle='#fff';x.font='bold 44px '+F;y+=50;x.fillText(l[1],60,y);y+=40}
-  else if(t=='m'){x.fillStyle='#e4e12a';x.font='bold 34px '+F;y+=40;x.fillText(l[1],60,y);y+=26}
-  else if(t=='h'){x.fillStyle='#e4e12a';x.font='bold 46px '+F;y+=60;x.fillText(l[1],60,y);y+=30}
+  else if(t=='m'){x.fillStyle='#22c55e';x.font='bold 34px '+F;y+=40;x.fillText(l[1],60,y);y+=26}
+  else if(t=='h'){x.fillStyle='#22c55e';x.font='bold 46px '+F;y+=60;x.fillText(l[1],60,y);y+=30}
   else if(t=='s'){x.fillStyle='#9aa8b4';x.font='32px '+F;y+=40;x.fillText(l[1],60,y);y+=20}
   else{x.fillStyle='#eef2f4';x.font='36px '+F;y+=36;x.textAlign='left';x.fillText(l[1],60,y);x.textAlign='right';x.fillText(l[2],W-60,y);x.textAlign='left';y+=18}
  });
@@ -873,7 +996,7 @@ function resume(){
 }
 
 function gate(){
- app.innerHTML='<div class="top"><h1>Gully Cricket</h1></div><div class="meta" style="margin-bottom:10px">Login to use the app. Watching a shared live link does not need login.</div><div id="mex"></div>';
+ app.innerHTML='<div class="top"><h1 class="brand">Gully Cricket</h1></div><div id="mex"></div>';
  loginForm();
 }
 function render(){
